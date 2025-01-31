@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
 import { Upload, FileText, AlertCircle, CheckCircle } from "lucide-react";
+import { generateSlug } from "@/lib/utils";
 
 const BulkUpload = () => {
   const [file, setFile] = useState<File | null>(null);
@@ -44,6 +45,7 @@ const BulkUpload = () => {
             description: product.description,
             price: parseFloat(product.price),
             status: "active",
+            slug: generateSlug(product.name),
           });
 
           if (error) throw error;

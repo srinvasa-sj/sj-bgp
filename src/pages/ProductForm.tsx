@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/components/ui/use-toast";
 import { Upload, X, Plus } from "lucide-react";
+import { generateSlug } from "@/lib/utils";
 
 const ProductForm = () => {
   const { id } = useParams();
@@ -96,6 +97,7 @@ const ProductForm = () => {
       const productData = {
         ...formData,
         price: parseFloat(formData.price),
+        slug: generateSlug(formData.name),
       };
 
       let productId = id;
