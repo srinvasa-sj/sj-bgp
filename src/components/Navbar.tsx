@@ -1,4 +1,4 @@
-import { ShoppingCart, Menu, X } from "lucide-react";
+import { ShoppingCart, Menu, X, Search } from "lucide-react";
 import { useState } from "react";
 import { Button } from "./ui/button";
 
@@ -10,7 +10,7 @@ const Navbar = () => {
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
           <a href="/" className="text-2xl font-semibold tracking-tight">
-            Store
+            LCART
           </a>
 
           {/* Desktop Navigation */}
@@ -24,8 +24,11 @@ const Navbar = () => {
             <a href="/about" className="text-foreground/80 hover:text-foreground transition-colors">
               About
             </a>
-            <Button variant="ghost" size="icon">
+            <Button variant="ghost" size="icon" className="relative">
               <ShoppingCart className="h-5 w-5" />
+              <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-primary text-[10px] font-medium text-primary-foreground flex items-center justify-center">
+                0
+              </span>
             </Button>
           </div>
 
@@ -57,7 +60,7 @@ const Navbar = () => {
               </a>
               <Button variant="ghost" size="sm" className="justify-start">
                 <ShoppingCart className="h-5 w-5 mr-2" />
-                Cart
+                Cart (0)
               </Button>
             </div>
           </div>
