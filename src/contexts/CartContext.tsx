@@ -32,10 +32,18 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
 
   const fetchCart = async () => {
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        console.log("No authenticated user");
+        return null;
+      }
+
       const { data: cart, error } = await supabase
         .from("carts")
         .select("id")
         .eq("status", "active")
+        .eq("user_id", user.id)
         .maybeSingle();
 
       if (error) throw error;
@@ -45,7 +53,7 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
           .from("carts")
           .insert({ 
             status: "active",
-            user_id: (await supabase.auth.getUser()).data.user?.id 
+            user_id: user.id
           })
           .select()
           .single();
@@ -57,6 +65,11 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
       return cart.id;
     } catch (error) {
       console.error("Error fetching cart:", error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to fetch cart. Please try again.",
+      });
       return null;
     }
   };
@@ -107,16 +120,17 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
       setIsLoading(false);
     };
 
-    initializeCart();
-
-    // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event) => {
       if (event === 'SIGNED_IN') {
-        initializeCart();
+        setIsLoading(true);
+        await initializeCart();
       } else if (event === 'SIGNED_OUT') {
         setItems([]);
+        setIsLoading(false);
       }
     });
+
+    initializeCart();
 
     return () => {
       subscription.unsubscribe();
