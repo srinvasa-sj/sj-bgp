@@ -11,6 +11,13 @@ import {
   Settings,
   BarChart3
 } from "lucide-react";
+import { LucideIcon } from "lucide-react";
+
+interface SidebarItem {
+  title: string;
+  icon: LucideIcon;
+  href: string;
+}
 
 export function AdminLayout({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
@@ -22,7 +29,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
     }
   }, [user, navigate]);
 
-  const sidebarItems = [
+  const sidebarItems: SidebarItem[] = [
     {
       title: "Dashboard",
       icon: LayoutDashboard,
