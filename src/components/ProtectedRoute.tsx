@@ -1,17 +1,34 @@
+import { useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { Navigate, useLocation } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
 
 export default function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
-  const location = useLocation();
+  const { user } = useAuth();
+  const navigate = useNavigate();
 
-  if (loading) {
-    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
-  }
+  useEffect(() => {
+    if (!user) {
+      navigate("/auth");
+      return;
+    }
 
-  if (!user) {
-    return <Navigate to="/auth" state={{ from: location }} replace />;
-  }
+    const checkAdminRole = async () => {
+      const { data, error } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", user.id)
+        .single();
+
+      if (error || !data || data.role !== "admin") {
+        navigate("/");
+      }
+    };
+
+    checkAdminRole();
+  }, [user, navigate]);
+
+  if (!user) return null;
 
   return <>{children}</>;
 }
