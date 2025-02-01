@@ -1,3 +1,5 @@
+import { CategoryTable, InventoryTable, ProductImageTable, ProductVariationTable, ProductTable } from './tables.types';
+
 export type Json =
   | string
   | number
