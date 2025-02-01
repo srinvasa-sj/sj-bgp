@@ -32,25 +32,29 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
 
   const fetchCart = async () => {
     try {
-      const { data: cart } = await supabase
+      const { data: cart, error } = await supabase
         .from("carts")
         .select("id")
         .eq("status", "active")
-        .single();
+        .maybeSingle();
+
+      if (error) throw error;
 
       if (!cart) {
-        const { data: newCart } = await supabase
+        const { data: newCart, error: createError } = await supabase
           .from("carts")
-          .insert({ status: "active" })
+          .insert({ 
+            status: "active",
+            user_id: (await supabase.auth.getUser()).data.user?.id 
+          })
           .select()
           .single();
 
-        if (newCart) {
-          return newCart.id;
-        }
+        if (createError) throw createError;
+        return newCart.id;
       }
 
-      return cart?.id;
+      return cart.id;
     } catch (error) {
       console.error("Error fetching cart:", error);
       return null;
@@ -58,34 +62,40 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const fetchCartItems = async (cartId: string) => {
-    const { data, error } = await supabase
-      .from("cart_items")
-      .select(`
-        id,
-        product_id,
-        quantity,
-        price_at_time,
-        products (
-          name,
-          product_images (url)
-        )
-      `)
-      .eq("cart_id", cartId);
+    try {
+      const { data, error } = await supabase
+        .from("cart_items")
+        .select(`
+          id,
+          product_id,
+          quantity,
+          price_at_time,
+          products (
+            name,
+            product_images (url)
+          )
+        `)
+        .eq("cart_id", cartId);
 
-    if (error) {
+      if (error) throw error;
+
+      setItems(
+        data.map((item) => ({
+          ...item,
+          product: {
+            name: item.products.name,
+            image: item.products.product_images?.[0]?.url,
+          },
+        }))
+      );
+    } catch (error) {
       console.error("Error fetching cart items:", error);
-      return;
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to fetch cart items. Please try again.",
+      });
     }
-
-    setItems(
-      data.map((item) => ({
-        ...item,
-        product: {
-          name: item.products.name,
-          image: item.products.product_images?.[0]?.url,
-        },
-      }))
-    );
   };
 
   useEffect(() => {
@@ -98,6 +108,19 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
     };
 
     initializeCart();
+
+    // Listen for auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event) => {
+      if (event === 'SIGNED_IN') {
+        initializeCart();
+      } else if (event === 'SIGNED_OUT') {
+        setItems([]);
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   const addItem = async (productId: string, quantity: number, price: number) => {
