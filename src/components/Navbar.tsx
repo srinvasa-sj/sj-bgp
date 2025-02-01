@@ -1,6 +1,7 @@
-import { ShoppingCart, Menu, X, Search } from "lucide-react";
+import { Menu, X, Search } from "lucide-react";
 import { useState } from "react";
 import { Button } from "./ui/button";
+import { Cart } from "./Cart";
 
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -24,12 +25,7 @@ const Navbar = () => {
             <a href="/about" className="text-foreground/80 hover:text-foreground transition-colors">
               About
             </a>
-            <Button variant="ghost" size="icon" className="relative">
-              <ShoppingCart className="h-5 w-5" />
-              <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-primary text-[10px] font-medium text-primary-foreground flex items-center justify-center">
-                0
-              </span>
-            </Button>
+            <Cart />
           </div>
 
           {/* Mobile Menu Button */}
@@ -58,10 +54,7 @@ const Navbar = () => {
               <a href="/about" className="text-foreground/80 hover:text-foreground transition-colors">
                 About
               </a>
-              <Button variant="ghost" size="sm" className="justify-start">
-                <ShoppingCart className="h-5 w-5 mr-2" />
-                Cart (0)
-              </Button>
+              <Cart />
             </div>
           </div>
         )}
