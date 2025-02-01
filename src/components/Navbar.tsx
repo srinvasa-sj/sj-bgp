@@ -1,10 +1,18 @@
-import { Menu, X, Search } from "lucide-react";
+import { Menu, X, LogIn, LogOut, User } from "lucide-react";
 import { useState } from "react";
-import { Button } from "./ui/button";
 import { Cart } from "./Cart";
+import { useAuth } from "@/contexts/AuthContext";
+import { Button } from "./ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "./ui/dropdown-menu";
 
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const { user, signOut } = useAuth();
 
   return (
     <nav className="fixed top-0 left-0 right-0 bg-background/80 backdrop-blur-md z-50 border-b">
@@ -26,6 +34,28 @@ const Navbar = () => {
               About
             </a>
             <Cart />
+            {user ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon">
+                    <User className="h-5 w-5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => signOut()}>
+                    <LogOut className="mr-2 h-4 w-4" />
+                    Sign Out
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <Button variant="ghost" size="sm" asChild>
+                <a href="/auth">
+                  <LogIn className="mr-2 h-4 w-4" />
+                  Sign In
+                </a>
+              </Button>
+            )}
           </div>
 
           {/* Mobile Menu Button */}
@@ -55,12 +85,25 @@ const Navbar = () => {
                 About
               </a>
               <Cart />
+              {user ? (
+                <Button variant="ghost" onClick={() => signOut()}>
+                  <LogOut className="mr-2 h-4 w-4" />
+                  Sign Out
+                </Button>
+              ) : (
+                <Button variant="ghost" asChild>
+                  <a href="/auth">
+                    <LogIn className="mr-2 h-4 w-4" />
+                    Sign In
+                  </a>
+                </Button>
+              )}
             </div>
           </div>
         )}
       </div>
     </nav>
   );
-};
+}
 
 export default Navbar;
