@@ -1,8 +1,9 @@
-import { Menu, X, LogIn, LogOut, User } from "lucide-react";
-import { useState } from "react";
+import { Menu, X, LogIn, LogOut, User, LayoutDashboard } from "lucide-react";
+import { useState, useEffect } from "react";
 import { Cart } from "./Cart";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "./ui/button";
+import { supabase } from "@/integrations/supabase/client";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,6 +14,25 @@ import {
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const { user, signOut } = useAuth();
+  const [userRole, setUserRole] = useState<string | null>(null);
+
+  useEffect(() => {
+    const getUserRole = async () => {
+      if (user) {
+        const { data, error } = await supabase
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", user.id)
+          .single();
+
+        if (!error && data) {
+          setUserRole(data.role);
+        }
+      }
+    };
+
+    getUserRole();
+  }, [user]);
 
   return (
     <nav className="fixed top-0 left-0 right-0 bg-background/80 backdrop-blur-md z-50 border-b">
@@ -42,6 +62,14 @@ const Navbar = () => {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
+                  {userRole === 'admin' && (
+                    <DropdownMenuItem asChild>
+                      <a href="/admin">
+                        <LayoutDashboard className="mr-2 h-4 w-4" />
+                        Dashboard
+                      </a>
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuItem onClick={() => signOut()}>
                     <LogOut className="mr-2 h-4 w-4" />
                     Sign Out
@@ -86,10 +114,18 @@ const Navbar = () => {
               </a>
               <Cart />
               {user ? (
-                <Button variant="ghost" onClick={() => signOut()}>
-                  <LogOut className="mr-2 h-4 w-4" />
-                  Sign Out
-                </Button>
+                <>
+                  {userRole === 'admin' && (
+                    <a href="/admin" className="flex items-center">
+                      <LayoutDashboard className="mr-2 h-4 w-4" />
+                      Dashboard
+                    </a>
+                  )}
+                  <Button variant="ghost" onClick={() => signOut()}>
+                    <LogOut className="mr-2 h-4 w-4" />
+                    Sign Out
+                  </Button>
+                </>
               ) : (
                 <Button variant="ghost" asChild>
                   <a href="/auth">
