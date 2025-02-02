@@ -23,7 +23,7 @@ const Navbar = () => {
           .from("user_roles")
           .select("role")
           .eq("user_id", user.id)
-          .single();
+          .maybeSingle();
 
         if (!error && data) {
           setUserRole(data.role);

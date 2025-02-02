@@ -25,9 +25,16 @@ export default function ProtectedRoute({ children, requiredRole }: ProtectedRout
           .from("user_roles")
           .select("role")
           .eq("user_id", user.id)
-          .single();
+          .maybeSingle();
 
-        if (error || !data || data.role !== requiredRole) {
+        if (error) {
+          console.error("Error checking user role:", error);
+          toast.error("Error checking permissions");
+          navigate("/");
+          return;
+        }
+
+        if (!data || data.role !== requiredRole) {
           toast.error("You don't have permission to access this page");
           navigate("/");
         }
