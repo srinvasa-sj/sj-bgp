@@ -41,7 +41,7 @@ export function CustomSidebar({ items, className }: CustomSidebarProps) {
         variant="ghost"
         size="sm"
         onClick={toggleTheme}
-        className="flex items-center justify-start w-full py-2 px-4 text-sm hover:bg-accent hover:text-accent-foreground transition-colors"
+        className="flex items-center justify-start w-full py-2 px-4 text-sm hover:bg-accent hover:text-accent-foreground transition-colors mt-auto"
       >
         {theme === 'dark' ? (
           <>
