@@ -10,9 +10,9 @@ import {
   ShoppingCart, 
   Users, 
   Settings,
-  BarChart3
+  BarChart3,
+  LucideIcon
 } from "lucide-react";
-import { LucideIcon } from "lucide-react";
 
 interface SidebarItem {
   title: string;
