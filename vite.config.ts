@@ -24,4 +24,7 @@ export default defineConfig(({ mode }) => ({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  server: {
+    allowedHosts: ["d32973be-b1b2-4dd6-8c43-3bb36aae28a8.lovableproject.com"]
+  }
 }));
