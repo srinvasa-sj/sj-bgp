@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -6,10 +7,13 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Navigate } from "react-router-dom";
+import { useTheme } from "@/contexts/ThemeContext";
+import { Sun, Moon } from "lucide-react";
 
 export default function Auth() {
   const { user, signIn, signUp } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
+  const { theme, toggleTheme } = useTheme();
 
   // Redirect if already logged in
   if (user) {
@@ -17,7 +21,26 @@ export default function Auth() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-background p-4">
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={toggleTheme}
+        className="absolute top-4 right-4 p-2"
+      >
+        {theme === 'dark' ? (
+          <>
+            <Sun className="h-5 w-5" />
+            <span className="sr-only">Switch to light mode</span>
+          </>
+        ) : (
+          <>
+            <Moon className="h-5 w-5" />
+            <span className="sr-only">Switch to dark mode</span>
+          </>
+        )}
+      </Button>
+
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle>Welcome to LCART</CardTitle>
