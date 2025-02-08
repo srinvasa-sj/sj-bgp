@@ -1,7 +1,8 @@
+
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { Sidebar } from "@/components/ui/sidebar";
+import { CustomSidebar } from "@/components/ui/custom-sidebar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { 
   LayoutDashboard, 
@@ -64,7 +65,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-screen overflow-hidden">
-      <Sidebar items={sidebarItems} />
+      <CustomSidebar items={sidebarItems} />
       <main className="flex-1 overflow-hidden">
         <ScrollArea className="h-full">
           <div className="container mx-auto py-6">
