@@ -1,179 +1,464 @@
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { Link } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+// import { useState, useEffect } from "react";
+// import { doc, getDoc, updateDoc } from "firebase/firestore";
+// import { db } from "@/lib/firebase";
+// import { toast } from "sonner";
+// import { Button } from "@/components/ui/button";
+// import { Input } from "@/components/ui/input";
+// import { Label } from "@/components/ui/label";
+// import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+// import { Edit, Trash2, ArrowLeft, Plus, Image as ImageIcon } from "lucide-react";
+// import { useNavigate } from "react-router-dom";
+
+// interface Product {
+//   category: string;
+//   name: string;
+//   weight: number;
+//   imageUrls: string[];
+//   imageUrl?: string; // For backward compatibility
+// }
+
+// const ProductManagement = () => {
+//   const navigate = useNavigate();
+//   const [products, setProducts] = useState<Product[]>([]);
+//   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+//   const [originalName, setOriginalName] = useState<string>("");
+//   const [loading, setLoading] = useState(true);
+
+//   useEffect(() => {
+//     fetchProducts();
+//   }, []);
+
+//   const fetchProducts = async () => {
+//     try {
+//       console.log("Fetching products...");
+//       const docRef = doc(db, "productData", "Ng4pODDHfqytrF2iqMtR");
+//       const docSnap = await getDoc(docRef);
+      
+//       if (docSnap.exists() && docSnap.data().products) {
+//         const productsData = docSnap.data().products;
+//         console.log("Products fetched:", productsData);
+//         setProducts(productsData);
+//       }
+//       setLoading(false);
+//     } catch (error) {
+//       console.error("Error fetching products:", error);
+//       toast.error("Error loading products");
+//       setLoading(false);
+//     }
+//   };
+
+//   const handleEdit = (product: Product) => {
+//     console.log("Editing product:", product);
+//     setOriginalName(product.name); // Store original name for updating
+//     setEditingProduct({
+//       ...product,
+//       imageUrls: product.imageUrls || [product.imageUrl || ""],
+//     });
+//   };
+
+//   const handleDelete = async (productName: string) => {
+//     try {
+//       const docRef = doc(db, "productData", "Ng4pODDHfqytrF2iqMtR");
+//       const updatedProducts = products.filter(p => p.name !== productName);
+//       await updateDoc(docRef, {
+//         products: updatedProducts
+//       });
+//       setProducts(updatedProducts);
+//       toast.success("Product deleted successfully");
+//     } catch (error) {
+//       console.error("Error deleting product:", error);
+//       toast.error("Error deleting product");
+//     }
+//   };
+
+//   const handleUpdate = async (updatedProduct: Product) => {
+//     try {
+//       console.log("Updating product:", updatedProduct);
+//       const docRef = doc(db, "productData", "Ng4pODDHfqytrF2iqMtR");
+//       const updatedProducts = products.map(p => 
+//         p.name === originalName ? {
+//           ...updatedProduct,
+//           imageUrl: updatedProduct.imageUrls[0], // Maintain backward compatibility
+//         } : p
+//       );
+//       await updateDoc(docRef, {
+//         products: updatedProducts
+//       });
+//       setProducts(updatedProducts);
+//       setEditingProduct(null);
+//       toast.success("Product updated successfully");
+//     } catch (error) {
+//       console.error("Error updating product:", error);
+//       toast.error("Error updating product");
+//     }
+//   };
+
+//   const addImageUrl = () => {
+//     if (editingProduct) {
+//       setEditingProduct({
+//         ...editingProduct,
+//         imageUrls: [...editingProduct.imageUrls, ""]
+//       });
+//     }
+//   };
+
+//   const removeImageUrl = (index: number) => {
+//     if (editingProduct && editingProduct.imageUrls.length > 1) {
+//       const newImageUrls = editingProduct.imageUrls.filter((_, i) => i !== index);
+//       setEditingProduct({
+//         ...editingProduct,
+//         imageUrls: newImageUrls
+//       });
+//     }
+//   };
+
+//   const handleImageUrlChange = (index: number, value: string) => {
+//     if (editingProduct) {
+//       const newImageUrls = [...editingProduct.imageUrls];
+//       newImageUrls[index] = value;
+//       setEditingProduct({
+//         ...editingProduct,
+//         imageUrls: newImageUrls
+//       });
+//     }
+//   };
+
+//   if (loading) {
+//     return (
+//       <div className="flex items-center justify-center min-h-screen">
+//         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-primary"></div>
+//       </div>
+//     );
+//   }
+
+//   return (
+//     <div className="space-y-6 p-6">
+//       <div className="flex items-center justify-between">
+//         <h1 className="text-3xl font-bold">Product Management</h1>
+//         <Button variant="outline" onClick={() => navigate("/admin")} className="flex items-center gap-2">
+//           <ArrowLeft className="h-4 w-4" />
+//           Back to Admin
+//         </Button>
+//       </div>
+
+//       <div className="grid gap-6">
+//         {products.map((product) => (
+//           <div key={product.name} className="glassy-card flex items-center gap-6">
+//             <div className="w-24 h-24 relative rounded-lg overflow-hidden bg-gray-100">
+//               {product.imageUrls?.[0] || product.imageUrl ? (
+//                 <img 
+//                   src={product.imageUrls?.[0] || product.imageUrl}
+//                   alt={product.name}
+//                   className="w-full h-full object-cover"
+//                   onError={(e) => {
+//                     const target = e.target as HTMLImageElement;
+//                     target.src = "/placeholder.svg";
+//                   }}
+//                 />
+//               ) : (
+//                 <div className="w-full h-full flex items-center justify-center">
+//                   <ImageIcon className="w-8 h-8 text-gray-400" />
+//                 </div>
+//               )}
+//             </div>
+            
+//             <div className="flex-grow space-y-2">
+//               <h3 className="text-xl font-semibold">{product.name}</h3>
+//               <p className="text-sm text-muted-foreground">
+//                 {product.category} - {product.weight}g
+//               </p>
+//             </div>
+            
+//             <div className="flex gap-2">
+//               <Button
+//                 variant="outline"
+//                 size="sm"
+//                 onClick={() => handleEdit(product)}
+//                 className="flex items-center gap-2"
+//               >
+//                 <Edit className="h-4 w-4" />
+//                 Edit
+//               </Button>
+//               <Button
+//                 variant="destructive"
+//                 size="sm"
+//                 onClick={() => handleDelete(product.name)}
+//                 className="flex items-center gap-2"
+//               >
+//                 <Trash2 className="h-4 w-4" />
+//                 Delete
+//               </Button>
+//             </div>
+//           </div>
+//         ))}
+//       </div>
+
+//       {editingProduct && (
+//         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+//           <div className="glassy-container max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+//             <h2 className="text-2xl font-bold mb-6">Edit Product</h2>
+//             <form
+//               onSubmit={(e) => {
+//                 e.preventDefault();
+//                 handleUpdate(editingProduct);
+//               }}
+//               className="space-y-6"
+//             >
+//               <div>
+//                 <Label>Category</Label>
+//                 <Select
+//                   value={editingProduct.category}
+//                   onValueChange={(value) =>
+//                     setEditingProduct({ ...editingProduct, category: value })
+//                   }
+//                 >
+//                   <SelectTrigger>
+//                     <SelectValue placeholder="Select category" />
+//                   </SelectTrigger>
+//                   <SelectContent>
+//                     <SelectItem value="24 Karat">24 Karat</SelectItem>
+//                     <SelectItem value="22 Karat">22 Karat</SelectItem>
+//                     <SelectItem value="20 Karat">20 Karat</SelectItem>
+//                     <SelectItem value="18 Karat">18 Karat</SelectItem>
+//                     <SelectItem value="Silver 1">Silver 1</SelectItem>
+//                     <SelectItem value="Silver 2">Silver 2</SelectItem>
+//                   </SelectContent>
+//                 </Select>
+//               </div>
+
+//               <div>
+//                 <Label>Name</Label>
+//                 <Input
+//                   value={editingProduct.name}
+//                   onChange={(e) =>
+//                     setEditingProduct({ ...editingProduct, name: e.target.value })
+//                   }
+//                 />
+//               </div>
+
+//               <div>
+//                 <Label>Weight (g)</Label>
+//                 <Input
+//                   type="number"
+//                   value={editingProduct.weight}
+//                   onChange={(e) =>
+//                     setEditingProduct({
+//                       ...editingProduct,
+//                       weight: parseFloat(e.target.value),
+//                     })
+//                   }
+//                   step="0.001"
+//                 />
+//               </div>
+
+//               <div className="space-y-4">
+//                 <div className="flex items-center justify-between">
+//                   <Label>Product Images</Label>
+//                   <Button
+//                     type="button"
+//                     variant="outline"
+//                     size="sm"
+//                     onClick={addImageUrl}
+//                     className="flex items-center gap-2"
+//                   >
+//                     <Plus className="h-4 w-4" />
+//                     Add Image
+//                   </Button>
+//                 </div>
+//                 {editingProduct.imageUrls.map((url, index) => (
+//                   <div key={index} className="flex gap-2 items-center">
+//                     <div className="flex-grow">
+//                       <Input
+//                         type="url"
+//                         value={url}
+//                         onChange={(e) => handleImageUrlChange(index, e.target.value)}
+//                         placeholder="Enter image URL"
+//                         required={index === 0}
+//                       />
+//                     </div>
+//                     {index > 0 && (
+//                       <Button
+//                         type="button"
+//                         variant="destructive"
+//                         size="icon"
+//                         onClick={() => removeImageUrl(index)}
+//                       >
+//                         <Trash2 className="h-4 w-4" />
+//                       </Button>
+//                     )}
+//                   </div>
+//                 ))}
+//               </div>
+
+//               <div className="flex gap-2 justify-end pt-4">
+//                 <Button
+//                   type="button"
+//                   variant="outline"
+//                   onClick={() => setEditingProduct(null)}
+//                 >
+//                   Cancel
+//                 </Button>
+//                 <Button type="submit">Save Changes</Button>
+//               </div>
+//             </form>
+//           </div>
+//         </div>
+//       )}
+//     </div>
+//   );
+// };
+
+// export default ProductManagement;
+
+
+import { useState, useEffect } from "react";
+import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  Plus,
-  Search,
-  Upload,
-  Package,
-  Edit,
-  Trash,
-  AlertCircle,
-} from "lucide-react";
-import { useToast } from "@/components/ui/use-toast";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Edit, Trash2, ArrowLeft, Plus } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+
+interface Product {
+  category: string;
+  name: string;
+  weight: number;
+  imageUrls: string[];
+  imageUrl?: string;
+}
 
 const ProductManagement = () => {
-  const [searchQuery, setSearchQuery] = useState("");
-  const { toast } = useToast();
+  const navigate = useNavigate();
+  const [products, setProducts] = useState<Product[]>([]);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [originalName, setOriginalName] = useState<string>("");
+  const [loading, setLoading] = useState(true);
 
-  const { data: products, isLoading } = useQuery({
-    queryKey: ["products"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("products")
-        .select(`
-          *,
-          category:categories(name),
-          images:product_images(url, is_primary),
-          inventory:inventory(quantity)
-        `);
+  useEffect(() => {
+    fetchProducts();
+  }, []);
 
-      if (error) throw error;
-      return data;
-    },
-  });
+  const fetchProducts = async () => {
+    try {
+      const docRef = doc(db, "productData", "Ng4pODDHfqytrF2iqMtR");
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists() && docSnap.data().products) {
+        setProducts(docSnap.data().products);
+      }
+      setLoading(false);
+    } catch (error) {
+      console.error("Error fetching products:", error);
+      toast.error("Error loading products");
+      setLoading(false);
+    }
+  };
 
-  const filteredProducts = products?.filter((product) =>
-    product.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const handleEdit = (product: Product) => {
+    setOriginalName(product.name);
+    setEditingProduct({ ...product, imageUrls: product.imageUrls || [product.imageUrl || ""] });
+  };
 
-  const handleDelete = async (id: string) => {
-    const { error } = await supabase.from("products").delete().eq("id", id);
+  const handleDelete = async (productName: string) => {
+    try {
+      const docRef = doc(db, "productData", "Ng4pODDHfqytrF2iqMtR");
+      const updatedProducts = products.filter((p) => p.name !== productName);
+      await updateDoc(docRef, { products: updatedProducts });
+      setProducts(updatedProducts);
+      toast.success("Product deleted successfully");
+    } catch (error) {
+      console.error("Error deleting product:", error);
+      toast.error("Error deleting product");
+    }
+  };
 
-    if (error) {
-      toast({
-        title: "Error",
-        description: "Failed to delete product",
-        variant: "destructive",
-      });
-    } else {
-      toast({
-        title: "Success",
-        description: "Product deleted successfully",
+  const handleUpdate = async () => {
+    if (!editingProduct) return;
+    try {
+      const docRef = doc(db, "productData", "Ng4pODDHfqytrF2iqMtR");
+      const updatedProducts = products.map((p) =>
+        p.name === originalName ? { ...editingProduct, imageUrl: editingProduct.imageUrls[0] } : p
+      );
+      await updateDoc(docRef, { products: updatedProducts });
+      setProducts(updatedProducts);
+      setEditingProduct(null);
+      toast.success("Product updated successfully");
+    } catch (error) {
+      console.error("Error updating product:", error);
+      toast.error("Error updating product");
+    }
+  };
+
+  const addImageUrl = () => {
+    if (editingProduct) {
+      setEditingProduct({
+        ...editingProduct,
+        imageUrls: [...editingProduct.imageUrls, ""]
       });
     }
   };
 
+  const handleImageUrlChange = (index: number, value: string) => {
+    if (editingProduct) {
+      const newImageUrls = [...editingProduct.imageUrls];
+      newImageUrls[index] = value;
+      setEditingProduct({ ...editingProduct, imageUrls: newImageUrls });
+    }
+  };
+
   return (
-    <div className="container py-8">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-3xl font-bold">Product Management</h1>
-        <div className="flex gap-2">
-          <Link to="/products/new">
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              Add Product
-            </Button>
-          </Link>
-          <Link to="/products/bulk-upload">
-            <Button variant="outline">
-              <Upload className="mr-2 h-4 w-4" />
-              Bulk Upload
-            </Button>
-          </Link>
-          <Link to="/inventory">
-            <Button variant="outline">
-              <Package className="mr-2 h-4 w-4" />
-              Inventory
-            </Button>
-          </Link>
-        </div>
+    <div className="container mx-auto p-8 space-y-8 bg-gradient-to-r from-gray-100 to-gray-300 rounded-lg shadow-lg">
+      <div className="flex items-center justify-between">
+        <h1 className="text-4xl font-bold text-gray-800">Product Management</h1>
+        <Button variant="outline" onClick={() => navigate("/admin")} className="flex items-center gap-2 bg-yellow-500 hover:bg-yellow-600 text-white">
+          <ArrowLeft className="h-5 w-5" /> Back to Admin
+        </Button>
       </div>
 
-      <div className="mb-6">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search products..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
-          />
-        </div>
+      <div className="grid gap-6">
+        {products.map((product) => (
+          <div key={product.name} className="p-6 bg-white rounded-lg shadow-lg flex items-center gap-6 transition-transform transform hover:scale-105">
+            <div className="w-24 h-24 rounded-lg overflow-hidden border border-gray-300">
+              <img src={product.imageUrls?.[0] || product.imageUrl || "/placeholder.svg"} alt={product.name} className="w-full h-full object-cover" />
+            </div>
+            <div className="flex-grow">
+              <h3 className="text-2xl font-semibold text-gray-700">{product.name}</h3>
+              <p className="text-md text-gray-500">{product.category} - {product.weight}g</p>
+            </div>
+            <div className="flex gap-3">
+              <Button variant="outline" size="sm" onClick={() => handleEdit(product)} className="bg-blue-500 hover:bg-blue-600 text-white">
+                <Edit className="h-5 w-5" /> Edit
+              </Button>
+              <Button variant="destructive" size="sm" onClick={() => handleDelete(product.name)} className="bg-red-500 hover:bg-red-600 text-white">
+                <Trash2 className="h-5 w-5" /> Delete
+              </Button>
+            </div>
+          </div>
+        ))}
       </div>
 
-      {isLoading ? (
-        <div className="text-center py-8">Loading...</div>
-      ) : (
-        <div className="border rounded-lg">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Image</TableHead>
-                <TableHead>Name</TableHead>
-                <TableHead>Category</TableHead>
-                <TableHead>Price</TableHead>
-                <TableHead>Stock</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredProducts?.map((product) => (
-                <TableRow key={product.id}>
-                  <TableCell>
-                    <div className="h-10 w-10 rounded-lg overflow-hidden bg-muted">
-                      {product.images?.[0]?.url ? (
-                        <img
-                          src={product.images[0].url}
-                          alt={product.name}
-                          className="h-full w-full object-cover"
-                        />
-                      ) : (
-                        <div className="h-full w-full flex items-center justify-center">
-                          <AlertCircle className="h-4 w-4 text-muted-foreground" />
-                        </div>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell>{product.name}</TableCell>
-                  <TableCell>{product.category?.name}</TableCell>
-                  <TableCell>₹{product.price.toLocaleString()}</TableCell>
-                  <TableCell>
-                    {product.inventory?.[0]?.quantity ?? "N/A"}
-                  </TableCell>
-                  <TableCell>
-                    <span
-                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        product.status === "active"
-                          ? "bg-green-100 text-green-800"
-                          : "bg-yellow-100 text-yellow-800"
-                      }`}
-                    >
-                      {product.status}
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
-                      <Link to={`/products/${product.id}/edit`}>
-                        <Button variant="ghost" size="icon">
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                      </Link>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleDelete(product.id)}
-                      >
-                        <Trash className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+      {editingProduct && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white p-6 rounded-lg shadow-lg max-w-lg w-full">
+            <h2 className="text-2xl font-bold mb-4">Edit Product</h2>
+            <Label>Category</Label>
+            <Input value={editingProduct.category} onChange={(e) => setEditingProduct({ ...editingProduct, category: e.target.value })} />
+            <Label>Name</Label>
+            <Input value={editingProduct.name} onChange={(e) => setEditingProduct({ ...editingProduct, name: e.target.value })} />
+            <Label>Weight (g)</Label>
+            <Input type="number" value={editingProduct.weight} onChange={(e) => setEditingProduct({ ...editingProduct, weight: parseFloat(e.target.value) })} />
+            <Label>Product Images</Label>
+            {editingProduct.imageUrls.map((url, index) => (
+              <Input key={index} type="url" value={url} onChange={(e) => handleImageUrlChange(index, e.target.value)} />
+            ))}
+            <Button type="button" onClick={addImageUrl} className="mt-2">Add Image</Button>
+            <div className="flex justify-end gap-2 mt-4">
+              <Button variant="outline" onClick={() => setEditingProduct(null)}>Cancel</Button>
+              <Button onClick={handleUpdate}>Save Changes</Button>
+            </div>
+          </div>
         </div>
       )}
     </div>
@@ -181,3 +466,4 @@ const ProductManagement = () => {
 };
 
 export default ProductManagement;
+

@@ -1,41 +1,60 @@
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { AuthProvider } from "@/contexts/AuthContext";
-import { CartProvider } from "@/contexts/CartContext";
-import { Toaster } from "@/components/ui/sonner";
-import Index from "@/pages/Index";
-import Auth from "@/pages/Auth";
-import NotFound from "@/pages/NotFound";
-import Dashboard from "@/pages/admin/Dashboard";
-import ProtectedRoute from "@/components/ProtectedRoute";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { Toaster as RadixToaster } from "@/components/ui/toaster";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { Toaster } from "sonner";
+import Index from "./pages/Index";
+import Home from "./pages/Home";
+import About from "./pages/About";
+import Gallery from "./pages/Gallery";
+import Products from "./pages/Products";
+import Contact from "./pages/Contact";
+import Login from "./pages/Login";
+import Admin from "./pages/Admin";
+import ProductDetails from "./pages/ProductDetails";
+import ProductManagement from "./pages/ProductManagement"; // Ensure correct file name with casing
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      refetchOnWindowFocus: false,
+      meta: {
+        onError: (error: Error) => {
+          console.error("Query error:", error);
+        }
+      }
+    }
+  }
+});
 
-function App() {
+const App = () => {
+  console.log("App rendering, setting up routes");
+
   return (
     <QueryClientProvider client={queryClient}>
-      <Router>
-        <AuthProvider>
-          <CartProvider>
-            <Routes>
-              <Route path="/" element={<Index />} />
-              <Route path="/auth" element={<Auth />} />
-              <Route
-                path="/admin"
-                element={
-                  <ProtectedRoute requiredRole="admin">
-                    <Dashboard />
-                  </ProtectedRoute>
-                }
-              />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-            <Toaster />
-          </CartProvider>
-        </AuthProvider>
-      </Router>
+      <TooltipProvider>
+        <RadixToaster />
+        <Toaster />
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<Index />}>
+              <Route index element={<Home />} />
+              <Route path="about" element={<About />} />
+              <Route path="gallery" element={<Gallery />} />
+              <Route path="products" element={<Products />} />
+              <Route path="product/:productName" element={<ProductDetails />} />
+              <Route path="contact" element={<Contact />} />
+              <Route path="login" element={<Login />} />
+              <Route path="admin" element={<Admin />} />
+              <Route path="admin/products" element={<ProductManagement />} />
+            </Route>
+          </Routes>
+        </BrowserRouter>
+      </TooltipProvider>
     </QueryClientProvider>
   );
-}
+};
 
 export default App;
