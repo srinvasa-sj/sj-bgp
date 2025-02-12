@@ -141,9 +141,9 @@ const Login = () => {
       </form>
       
       <div className="mt-4 text-center">
-        {/* <p className="text-sm text-gray-600">
+        <p className="text-sm text-gray-600">
          {isSignUp ? "Already have an account?" : "Don't have an account?"}
-        </p> */}
+        </p>
         <Button
           variant="link"
           onClick={() => setIsSignUp(!isSignUp)}

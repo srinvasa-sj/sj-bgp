@@ -29,7 +29,7 @@ const PriceUpdateForm = () => {
       }), {});
 
       // Add timestamp when updating prices
-      await setDoc(doc(db, "priceData", "9wWClo0OSjIY6odJfvN4"), {
+      await setDoc(doc(db, "priceData", "OTjdBq7kTmGMXWDpMKvg"), {
         ...numericFormData,
         timestamp: serverTimestamp()
       });
@@ -128,7 +128,7 @@ const PriceUpdateForm = () => {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="priceSilver1">Silver 1 Price (per gram)</Label>
+            <Label htmlFor="priceSilver1">Fine Silver-99.9% Price (per gram)</Label>
             <Input
               type="number"
               id="priceSilver1"
@@ -138,7 +138,7 @@ const PriceUpdateForm = () => {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="priceSilver2">Silver 2 Price (per gram)</Label>
+            <Label htmlFor="priceSilver2">Sterling Silver-92.5% Price (per gram)</Label>
             <Input
               type="number"
               id="priceSilver2"

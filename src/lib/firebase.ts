@@ -4,13 +4,13 @@ import { getFirestore } from "firebase/firestore";
 import { toast } from "sonner";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyAoGs0xWn3oqnV4Z2o5JQmIyaIdCqfS46I",
-  authDomain: "srinivas-jewellars.firebaseapp.com",
-  projectId: "srinivas-jewellars",
-  storageBucket: "srinivas-jewellars.appspot.com",
-  messagingSenderId: "626344249659",
-  appId: "1:626344249659:web:7925aa41bf2dfadbd40f1e",
-  measurementId: "G-WTWX9E7VZG"
+  apiKey: "AIzaSyCPmDEy-1T5oraj7G1fTql35heovCL29C0",
+  authDomain: "srinivasajewellers-sj.firebaseapp.com",
+  projectId: "srinivasajewellers-sj",
+  storageBucket: "srinivasajewellers-sj.firebasestorage.app",
+  messagingSenderId: "632116215684",
+  appId: "1:632116215684:web:d00c50ba32fe28217267d1",
+  measurementId: "G-JCP95HKH2K"
 };
 
 const app = initializeApp(firebaseConfig);

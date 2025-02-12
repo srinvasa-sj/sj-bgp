@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { doc, getDoc, collection, getDocs, query, where } from "firebase/firestore";
@@ -9,7 +10,7 @@ import PriceBreakdown from "@/components/products/details/PriceBreakdown";
 
 interface Product {
   name: string;
-  category: string;
+  purity: string;
   weight: number;
   imageUrl: string;
   imageUrls?: string[];
@@ -28,35 +29,30 @@ const ProductDetails = () => {
     const fetchProductDetails = async () => {
       try {
         console.log("Fetching product details for:", productName);
-        const docRef = doc(db, "productData", "Ng4pODDHfqytrF2iqMtR");
+        const docRef = doc(db, "productData", "UelsUgCcOKCYUVPV2dRC");
         const docSnap = await getDoc(docRef);
 
         if (docSnap.exists()) {
           const productsData = docSnap.data().products;
           const productData = productsData.find((p: Product) => p.name === productName);
-          
+
           if (productData) {
-            // Combine all available images, ensuring no duplicates
-            const allImages = Array.from(new Set([
-              productData.imageUrl,
-              ...(productData.imageUrls || [])
-            ])).filter(Boolean);
-            
+            const allImages = Array.from(new Set([productData.imageUrl, ...(productData.imageUrls || [])])).filter(Boolean);
             setProduct({
               ...productData,
-              imageUrls: allImages
+              imageUrls: allImages,
             });
-            
+
             await fetchPromotionDetails(productData);
             await calculatePrices(productData);
           } else {
             toast.error("Product not found");
           }
         }
-        setIsLoading(false);
       } catch (error) {
         console.error("Error fetching product details:", error);
         toast.error("Error loading product details");
+      } finally {
         setIsLoading(false);
       }
     };
@@ -67,20 +63,16 @@ const ProductDetails = () => {
   const fetchPromotionDetails = async (product: Product) => {
     try {
       const promotionsRef = collection(db, "promotions");
-      const q = query(
-        promotionsRef,
-        where("productName", "==", product.name),
-        where("active", "==", true)
-      );
-      
+      const q = query(promotionsRef, where("productName", "==", product.name), where("active", "==", true));
+
       const querySnapshot = await getDocs(q);
       const currentDate = new Date();
-      
+
       querySnapshot.forEach((doc) => {
         const promoData = doc.data();
         const startDate = new Date(promoData.startDate);
         const endDate = new Date(promoData.endDate);
-        
+
         if (currentDate >= startDate && currentDate <= endDate) {
           console.log("Found active promotion:", promoData);
           setActivePromotion({ ...promoData, id: doc.id });
@@ -93,9 +85,9 @@ const ProductDetails = () => {
 
   const calculatePrices = async (product: Product) => {
     try {
-      const priceDocRef = doc(db, "priceData", "9wWClo0OSjIY6odJfvN4");
+      const priceDocRef = doc(db, "priceData", "OTjdBq7kTmGMXWDpMKvg");
       const priceDocSnap = await getDoc(priceDocRef);
-      
+
       if (!priceDocSnap.exists()) {
         toast.error("Error: Price data not available");
         return;
@@ -107,8 +99,8 @@ const ProductDetails = () => {
       let makingChargesPerGram = 0;
       let applyWastageMakingCharges = true;
 
-      // Get the correct price and charges based on category
-      switch (product.category) {
+      // Get the correct price and charges based on purity
+      switch (product.purity) {
         case "18 Karat":
           basePrice = priceData.price18Karat;
           wastagePercentage = priceData.goldwastageCharges;
@@ -128,18 +120,18 @@ const ProductDetails = () => {
           basePrice = priceData.price24Karat;
           applyWastageMakingCharges = false;
           break;
-        case "Silver 1":
+        case "Fine Silver-99.9%":
           basePrice = priceData.priceSilver1;
           wastagePercentage = priceData.wastageChargesSilver;
           makingChargesPerGram = priceData.makingChargesSilver;
           break;
-        case "Silver 2":
+        case "Sterling Silver-92.5%":
           basePrice = priceData.priceSilver2;
           wastagePercentage = priceData.wastageChargesSilver;
           makingChargesPerGram = priceData.makingChargesSilver;
           break;
         default:
-          toast.error("Error: Invalid product category");
+          toast.error("Error: Invalid product purity");
           return;
       }
 
@@ -159,21 +151,22 @@ const ProductDetails = () => {
         wastageCharges,
         makingCharges,
         wastagePercentage,
-        makingChargesPerGram
+        makingChargesPerGram,
       });
 
       setOriginalPrice(totalPrice);
 
       // Calculate promotion price if active promotion exists
       if (activePromotion) {
-        console.log("Calculating promotion price with promotion:", activePromotion);
-        const discountedBasePrice = basePrice * (1 - (activePromotion.priceDiscount / 100));
-        const discountedWastage = applyWastageMakingCharges ? 
-          baseAmount * ((wastagePercentage * (1 - (activePromotion.wastageDiscount / 100))) / 100) : 0;
-        const discountedMaking = applyWastageMakingCharges ? 
-          (makingChargesPerGram * (1 - (activePromotion.makingChargesDiscount / 100))) * product.weight : 0;
-        
-        const promotionalPrice = (discountedBasePrice * product.weight) + discountedWastage + discountedMaking;
+        const discountedBasePrice = basePrice * (1 - activePromotion.priceDiscount / 100);
+        const discountedWastage = applyWastageMakingCharges
+          ? baseAmount * ((wastagePercentage * (1 - activePromotion.wastageDiscount / 100)) / 100)
+          : 0;
+        const discountedMaking = applyWastageMakingCharges
+          ? makingChargesPerGram * (1 - activePromotion.makingChargesDiscount / 100) * product.weight
+          : 0;
+
+        const promotionalPrice = discountedBasePrice * product.weight + discountedWastage + discountedMaking;
         setPromotionPrice(promotionalPrice);
       }
     } catch (error) {
@@ -182,7 +175,7 @@ const ProductDetails = () => {
     }
   };
 
-  if (isLoading) {
+  if (isLoading || !product || !priceBreakdown) {
     return (
       <div className="container mx-auto px-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -209,23 +202,19 @@ const ProductDetails = () => {
     <div className="container mx-auto px-4 py-8">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         <ImageGallery mainImage={product.imageUrl} images={product.imageUrls} />
-        
-        <div className="space-y-6">
-          <div>
-            <h1 className="text-3xl font-bold mb-2">{product.name}</h1>
-            <p className="text-gray-600">Category: {product.category}</p>
-            <p className="text-gray-600">Weight: {product.weight}g</p>
-          </div>
-          
-          {originalPrice && priceBreakdown && (
-            <PriceBreakdown
-              priceBreakdown={priceBreakdown}
-              originalPrice={originalPrice}
-              promotionPrice={promotionPrice}
-              activePromotion={activePromotion}
-              product={product}
-            />
-          )}
+
+        <div className="space-y-4">
+          <h1 className="text-2xl font-semibold">Name: {product.name}</h1>
+          <h2 className="text-xl text-gray-500">Purity: {product.purity}</h2>
+          <p className="text-lg">Weight: {product.weight} grams</p>
+
+          <PriceBreakdown
+            originalPrice={originalPrice}
+            promotionPrice={promotionPrice}
+            priceBreakdown={priceBreakdown}
+            activePromotion={activePromotion}
+            product={product}
+          />
         </div>
       </div>
     </div>

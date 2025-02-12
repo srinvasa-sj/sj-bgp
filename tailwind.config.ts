@@ -1,4 +1,3 @@
-
 import { type Config } from "tailwindcss";
 import { fontFamily } from "tailwindcss/defaultTheme";
 
@@ -19,6 +18,12 @@ export default {
       },
     },
     extend: {
+      keyframes: {
+        marquee: {
+          '0%': { transform: 'translateX(100%)' },
+          '100%': { transform: 'translateX(-100%)' },
+        },
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
@@ -54,17 +59,6 @@ export default {
           foreground: "hsl(var(--card-foreground))",
         },
       },
-      borderRadius: {
-        lg: "var(--radius)",
-        md: "calc(var(--radius) - 2px)",
-        sm: "calc(var(--radius) - 4px)",
-      },
-      keyframes: {
-        marquee: {
-          '0%': { transform: 'translateX(100%)' },
-          '100%': { transform: 'translateX(-100%)' },
-        },
-      },
       fontFamily: {
         sans: ["Inter", ...fontFamily.sans],
       },
@@ -72,7 +66,13 @@ export default {
         '128': '32rem',
         '144': '36rem',
       },
+      borderRadius: {
+        lg: 'var(--radius)',
+        md: 'calc(var(--radius) - 2px)',
+        sm: 'calc(var(--radius) - 4px)',
+      },
     },
+    
   },
   plugins: [],
 } satisfies Config;

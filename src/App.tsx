@@ -4,7 +4,6 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Toaster as RadixToaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "sonner";
-import { ThemeProvider } from "@/contexts/ThemeContext";
 import Index from "./pages/Index";
 import Home from "./pages/Home";
 import About from "./pages/About";
@@ -14,7 +13,7 @@ import Contact from "./pages/Contact";
 import Login from "./pages/Login";
 import Admin from "./pages/Admin";
 import ProductDetails from "./pages/ProductDetails";
-import ProductManagement from "./pages/ProductManagement";
+import ProductManagement from "./pages/ProductManagement"; // Ensure correct file name with casing
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -35,27 +34,25 @@ const App = () => {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider>
-        <TooltipProvider>
-          <RadixToaster />
-          <Toaster />
-          <BrowserRouter>
-            <Routes>
-              <Route path="/" element={<Index />}>
-                <Route index element={<Home />} />
-                <Route path="about" element={<About />} />
-                <Route path="gallery" element={<Gallery />} />
-                <Route path="products" element={<Products />} />
-                <Route path="product/:productName" element={<ProductDetails />} />
-                <Route path="contact" element={<Contact />} />
-                <Route path="login" element={<Login />} />
-                <Route path="admin" element={<Admin />} />
-                <Route path="admin/products" element={<ProductManagement />} />
-              </Route>
-            </Routes>
-          </BrowserRouter>
-        </TooltipProvider>
-      </ThemeProvider>
+      <TooltipProvider>
+        <RadixToaster />
+        <Toaster />
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<Index />}>
+              <Route index element={<Home />} />
+              <Route path="about" element={<About />} />
+              <Route path="gallery" element={<Gallery />} />
+              <Route path="products" element={<Products />} />
+              <Route path="product/:productName" element={<ProductDetails />} />
+              <Route path="contact" element={<Contact />} />
+              <Route path="login" element={<Login />} />
+              <Route path="admin" element={<Admin />} />
+              <Route path="admin/products" element={<ProductManagement />} />
+            </Route>
+          </Routes>
+        </BrowserRouter>
+      </TooltipProvider>
     </QueryClientProvider>
   );
 };

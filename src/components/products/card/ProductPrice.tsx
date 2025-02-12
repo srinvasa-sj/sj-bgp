@@ -1,3 +1,4 @@
+
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 
@@ -9,6 +10,7 @@ interface ProductPriceProps {
   activePromotion: any;
   onCheckPrice: () => void;
   productName: string;
+  productID?: string;
 }
 
 const ProductPrice = ({
@@ -18,7 +20,8 @@ const ProductPrice = ({
   promotionPrice,
   activePromotion,
   onCheckPrice,
-  productName
+  productName,
+  productID
 }: ProductPriceProps) => {
   const navigate = useNavigate();
 
