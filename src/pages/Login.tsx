@@ -58,14 +58,17 @@ const Login = () => {
         const userDoc = await getDoc(doc(db, "users", userCredential.user.uid));
         const userData = userDoc.data();
         
-        if (!userData || userData.role !== "admin") {
-          toast.error("Unauthorized access. Admin privileges required.");
+        if (userData.role === "admin") {
+          toast.success("Login successful!");
+          navigate("/admin");
+        } else if (userData.role === "Customer") {
+          toast.success("Login successful!");
+          navigate("/customer-dashboard");
+        } else {
+          toast.error("Unauthorized access. Please contact support.");
           await auth.signOut();
           return;
         }
-
-        toast.success("Login successful!");
-        navigate("/admin");
       }
     } catch (error: any) {
       let errorMessage = "Unauthorized / Invalid credentials";
@@ -82,7 +85,7 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background mt-16 sm:mt-0">
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-md mx-auto bg-white rounded-lg shadow-md p-6 space-y-6">
           <div className="text-center">

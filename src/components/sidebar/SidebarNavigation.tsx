@@ -1,6 +1,7 @@
 import { Link, useLocation } from "react-router-dom";
 import { Home, Info, Image, ShoppingBag, Phone, Settings, LogIn } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { UserData } from "@/types/user"; // Import UserData interface
 
 interface NavItem {
   path: string;
@@ -10,11 +11,14 @@ interface NavItem {
 
 interface SidebarNavigationProps {
   isAdmin: boolean;
+  userData: UserData | null;
   onClose: () => void;
 }
 
-export const SidebarNavigation = ({ isAdmin, onClose }: SidebarNavigationProps) => {
+export const SidebarNavigation = ({ isAdmin, userData, onClose }: SidebarNavigationProps) => {
   const location = useLocation();
+
+  const isCustomer = userData?.role === "Customer";
 
   const menuItems: NavItem[] = [
     { path: "/", label: "Home", icon: Home },
@@ -22,8 +26,10 @@ export const SidebarNavigation = ({ isAdmin, onClose }: SidebarNavigationProps) 
     { path: "/gallery", label: "Gallery", icon: Image },
     { path: "/products", label: "Products", icon: ShoppingBag },
     { path: "/contact", label: "Contact", icon: Phone },
-    isAdmin 
+    isAdmin
       ? { path: "/admin", label: "Admin", icon: Settings }
+      : isCustomer
+      ? { path: "/customer-dashboard", label: "Customer", icon: Settings }
       : { path: "/login", label: "Login", icon: LogIn },
   ];
 

@@ -83,7 +83,7 @@ const Header = ({ toggleSidebar }: HeaderProps) => {
             onClick={toggleSidebar}
             className="lg:hidden hover:bg-[#FFD700]/10 transition-all duration-300"
           >
-            <Menu className="h-6 w-6 text-[#FFD700]" />
+            <Menu className="h-10 w-10 text-[#0b0c33]" />
           </Button>
 
           <div className="w-10 h-10 lg:w-12 lg:h-12 rounded-full overflow-hidden border-4 border-[#FFD700] shadow-lg ring-2 ring-[#FFD700]/30">
@@ -103,7 +103,7 @@ const Header = ({ toggleSidebar }: HeaderProps) => {
               <Input
                 type="search"
                 placeholder="Search products..."
-                className="pl-10 w-full py-1.5 text-sm rounded-lg border-2 border-gray-300 focus:border-[#FFD700] focus:ring-[#FFD700]"
+                className="pl-10 w-full py-1.5  text-sm rounded-lg border-2 border-gray-300 focus:border-[#FFD700] focus:ring-[#FFD700]"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
@@ -117,8 +117,8 @@ const Header = ({ toggleSidebar }: HeaderProps) => {
                 onClick={() => handleCategoryClick(category)}
                 className={`whitespace-nowrap px-2 py-1 text-xs rounded-full transition-colors ${
                   selectedCategory === category
-                    ? "bg-[#9b87f5] text-white hover:bg-[#7E69AB]"
-                    : "text-[#6E59A5] hover:bg-[#E5DEFF]"
+                    ? "bg-[#9b87f5] text-black hover:bg-[#cae630]"
+                    : "text-[#040208] hover:bg-[#b2ce35]"
                 }`}
               >
                 {category}
@@ -136,8 +136,8 @@ const Header = ({ toggleSidebar }: HeaderProps) => {
                 onClick={() => handleCategoryClick(category)}
                 className={`whitespace-nowrap px-3 py-1 text-sm rounded-full transition-colors ${
                   selectedCategory === category
-                    ? "bg-[#9b87f5] text-white hover:bg-[#7E69AB]"
-                    : "text-[#6E59A5] hover:bg-[#E5DEFF]"
+                    ? "bg-[#9b87f5] text-black hover:bg-[#cae630]"
+                    : "text-[#040208] hover:bg-[#b2ce35]"
                 }`}
               >
                 {category}

@@ -21,6 +21,15 @@ const Gallery = () => {
   // Number of thumbnails visible in the thumbnail carousel
   const visibleThumbnails = 8;
 
+  // Define autoScroll in a scope accessible to both useEffect and event handlers
+  let autoScroll: NodeJS.Timeout;
+
+  const startAutoScroll = () => {
+    autoScroll = setInterval(() => {
+      setCurrentImageIndex((prev) => (prev + 1) % images.length);
+    }, 4000);
+  };
+
   useEffect(() => {
     const fetchImages = async () => {
       try {
@@ -51,12 +60,8 @@ const Gallery = () => {
   }, []);
 
   useEffect(() => {
-    if (images.length > 0) {
-      const timer = setInterval(() => {
-        setCurrentImageIndex((prev) => (prev + 1) % images.length);
-      }, 4000);
-      return () => clearInterval(timer);
-    }
+    startAutoScroll();
+    return () => clearInterval(autoScroll);
   }, [images.length]);
 
   const prevImage = () => {
@@ -69,10 +74,10 @@ const Gallery = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background">
+      <div className="min-h-screen bg-background mt-16 sm:mt-0">
         <div className="container mx-auto px-2 sm:px-4 py-4 sm:py-8 max-w-7xl">
           <section className="page-header-margin">
-            <h1 className="text-2xl text-center sm:text-left sm:text-4xl md:text-5xl font-bold text-primary mb-3 sm:mb-4 leading-tight">
+            <h1 className="text-2xl text-center sm:text-left sm:text-4xl md:text-5xl font-bold text-black  mb-3 sm:mb-4 leading-tight">
               Gallery
             </h1>
             <div className="relative w-full h-[600px] flex justify-center items-center">
@@ -86,10 +91,10 @@ const Gallery = () => {
 
   if (images.length === 0) {
     return (
-      <div className="min-h-screen bg-background">
+      <div className="min-h-screen bg-background mt-16 sm:mt-0">
         <div className="container mx-auto px-2 sm:px-4 py-4 sm:py-8 max-w-7xl">
           <section className="page-header-margin">
-            <h1 className="text-2xl text-center sm:text-left sm:text-4xl md:text-5xl font-bold text-primary mb-3 sm:mb-4 leading-tight">
+            <h1 className="text-2xl text-center sm:text-left sm:text-4xl md:text-5xl font-bold text-black mb-3 sm:mb-4 leading-tight">
               Gallery
             </h1>
             <p className="text-gray-900 text-center">No images available in the gallery.</p>
@@ -100,10 +105,10 @@ const Gallery = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background mt-16 sm:mt-0">
       <div className="container mx-auto px-2 sm:px-4 py-4 sm:py-8 max-w-7xl">
         <section className="page-header-margin">
-          <h1 className="text-2xl text-center sm:text-left sm:text-4xl md:text-5xl font-bold text-primary mb-3 sm:mb-4 leading-tight">
+          <h1 className="text-2xl text-left sm:text-left sm:text-4xl md:text-5xl font-bold text-primary mb-3 sm:mb-4 leading-tight">
             Gallery
           </h1>
           {/* Main Image Carousel */}
@@ -111,7 +116,9 @@ const Gallery = () => {
             <img
               src={images[currentImageIndex].imageUrl}
               alt={`Gallery image ${currentImageIndex + 1}`}
-              className="w-full h-full object-contain transition-transform duration-500 ease-in-out hover:scale-105"
+              className="w-full h-full object-cover transition-transform duration-500 ease-in-out hover:scale-105"
+              onMouseEnter={() => clearInterval(autoScroll)}
+              onMouseLeave={() => startAutoScroll()}
               onError={(e) => {
                 const target = e.target as HTMLImageElement;
                 target.src = "/placeholder.svg";

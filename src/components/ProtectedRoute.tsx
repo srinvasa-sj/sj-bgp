@@ -15,6 +15,7 @@ export default function ProtectedRoute({ children, requireAdmin = false }: Prote
   const navigate = useNavigate();
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [userData, setUserData] = useState<any>(null);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -25,15 +26,18 @@ export default function ProtectedRoute({ children, requireAdmin = false }: Prote
           return;
         }
 
-        if (requireAdmin) {
-          const userDoc = await getDoc(doc(db, "users", user.uid));
-          const userData = userDoc.data();
-          
-          if (!userData || userData.role !== "admin") {
-            toast.error("Unauthorized access. Admin privileges required.");
-            navigate("/");
-            return;
-          }
+        const userDoc = await getDoc(doc(db, "users", user.uid));
+        const userData = userDoc.data();
+        setUserData(userData);
+
+        if (requireAdmin && (!userData || userData.role !== "admin")) {
+          toast.error("Unauthorized access. Admin privileges required.");
+          navigate("/");
+          return;
+        } else if (!requireAdmin && (!userData || (userData.role !== "admin" && userData.role !== "Customer"))) {
+          toast.error("Unauthorized access. Please login as a Customer or Admin.");
+          navigate("/login");
+          return;
         }
 
         setIsAuthorized(true);

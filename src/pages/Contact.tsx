@@ -35,10 +35,10 @@ const Contact = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background mt-16 sm:mt-0">
       <div className="container mx-auto px-2 sm:px-4 py-4 sm:py-8 max-w-7xl">
         <section className="page-header-margin">
-          <h1 className="text-2xl text-center sm:text-4xl md:text-5xl font-bold text-primary mb-3 sm:mb-4 leading-tight">
+          <h1 className="text-2xl text-center sm:text-4xl md:text-5xl font-bold text-black  mb-3 sm:mb-4 leading-tight">
             Leave your information here
           </h1>
       <p className="text-lg text-center text-gray-600">

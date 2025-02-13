@@ -15,7 +15,7 @@ export const SidebarHeader = ({ onClose }: SidebarHeaderProps) => {
         className="lg:hidden hover:bg-primary/10"
         onClick={onClose}
       >
-        <X className="h-6 w-6" />
+        <X className="h-8 w-8 text-black" />
       </Button>
     </div>
   );

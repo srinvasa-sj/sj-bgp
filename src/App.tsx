@@ -15,6 +15,7 @@ import ProductDetails from "./pages/ProductDetails";
 import ProductManagement from "./pages/ProductManagement"; // Ensure correct file name with casing
 import Reports from "@/pages/admin/Reports";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import CustomerDashboard from "./pages/CustomerDashboard";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -51,6 +52,7 @@ const App = () => {
               <Route path="admin" element={<ProtectedRoute requireAdmin><Admin /></ProtectedRoute>} />
               <Route path="admin/products" element={<ProductManagement />} />
               <Route path="admin/reports" element={<ProtectedRoute requireAdmin><Reports /></ProtectedRoute>} />
+              <Route path="customer-dashboard" element={<ProtectedRoute><CustomerDashboard /></ProtectedRoute>} />
             </Route>
           </Routes>
         </BrowserRouter>
