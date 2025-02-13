@@ -22,7 +22,7 @@ const AddImage = () => {
   const [isLoading, setIsLoading] = useState(true);
 
   // Firestore document reference (all images are stored in the "images" field)
-  const docRef = doc(db, "imageData", "HmmGvqB8GP1SMta5mRT2");
+  const docRef = doc(db, "imageData", "v7l44PuRudnQjGs5jQjf");
 
   // Fetch images from the document
   const fetchImages = async () => {

@@ -29,7 +29,7 @@ const ProductDetails = () => {
     const fetchProductDetails = async () => {
       try {
         console.log("Fetching product details for:", productName);
-        const docRef = doc(db, "productData", "UelsUgCcOKCYUVPV2dRC");
+        const docRef = doc(db, "productData", "zzeEfRyePYTdWemfHHWH");
         const docSnap = await getDoc(docRef);
 
         if (docSnap.exists()) {
@@ -85,7 +85,7 @@ const ProductDetails = () => {
 
   const calculatePrices = async (product: Product) => {
     try {
-      const priceDocRef = doc(db, "priceData", "OTjdBq7kTmGMXWDpMKvg");
+      const priceDocRef = doc(db, "priceData", "4OhZCKHQls64bokVqGN5");
       const priceDocSnap = await getDoc(priceDocRef);
 
       if (!priceDocSnap.exists()) {

@@ -97,7 +97,7 @@
 
 //     const fetchProducts = async () => {
 //       try {
-//         const docRef = doc(db, "productData", "UelsUgCcOKCYUVPV2dRC");
+//         const docRef = doc(db, "productData", "zzeEfRyePYTdWemfHHWH");
 //         const docSnap = await getDoc(docRef);
 //         console.log("Fetching products...");
 
@@ -444,7 +444,7 @@
 //   useEffect(() => {
 //     const fetchProducts = async () => {
 //       try {
-//         const docRef = doc(db, "productData", "UelsUgCcOKCYUVPV2dRC");
+//         const docRef = doc(db, "productData", "zzeEfRyePYTdWemfHHWH");
 //         const docSnap = await getDoc(docRef);
 
 //         if (docSnap.exists() && docSnap.data().products) {
@@ -474,7 +474,7 @@
 
 //   useEffect(() => {
 //     const calculatePrices = async () => {
-//       const priceDocRef = doc(db, "priceData", "OTjdBq7kTmGMXWDpMKvg");
+//       const priceDocRef = doc(db, "priceData", "4OhZCKHQls64bokVqGN5");
 //       try {
 //         const priceDocSnap = await getDoc(priceDocRef);
 //         if (!priceDocSnap.exists()) return;
@@ -861,7 +861,7 @@ const Products = () => {
   useEffect(() => {
     const fetchProducts = async () => {
       try {
-        const docRef = doc(db, "productData", "UelsUgCcOKCYUVPV2dRC");
+        const docRef = doc(db, "productData", "zzeEfRyePYTdWemfHHWH");
         const docSnap = await getDoc(docRef);
 
         if (docSnap.exists() && docSnap.data().products) {
@@ -900,7 +900,7 @@ const Products = () => {
 
   useEffect(() => {
     const calculatePrices = async () => {
-      const priceDocRef = doc(db, "priceData", "OTjdBq7kTmGMXWDpMKvg");
+      const priceDocRef = doc(db, "priceData", "4OhZCKHQls64bokVqGN5");
       try {
         const priceDocSnap = await getDoc(priceDocRef);
         if (!priceDocSnap.exists()) return;

@@ -1,50 +1,61 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "@/contexts/AuthContext";
-import { supabase } from "@/integrations/supabase/client";
+import { auth, db } from "@/lib/firebase";
+import { doc, getDoc } from "firebase/firestore";
 import { toast } from "sonner";
+import { onAuthStateChanged } from "firebase/auth";
+import { Loader2 } from "lucide-react";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
-  requiredRole?: 'admin' | 'seller' | 'customer';
+  requireAdmin?: boolean;
 }
 
-export default function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) {
-  const { user } = useAuth();
+export default function ProtectedRoute({ children, requireAdmin = false }: ProtectedRouteProps) {
   const navigate = useNavigate();
+  const [isAuthorized, setIsAuthorized] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (!user) {
-      navigate("/auth");
-      return;
-    }
-
-    const checkUserRole = async () => {
-      if (requiredRole) {
-        const { data, error } = await supabase
-          .from("user_roles")
-          .select("role")
-          .eq("user_id", user.id)
-          .maybeSingle();
-
-        if (error) {
-          console.error("Error checking user role:", error);
-          toast.error("Error checking permissions");
-          navigate("/");
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      try {
+        if (!user) {
+          toast.error("Please login to access this page");
+          navigate("/login");
           return;
         }
 
-        if (!data || data.role !== requiredRole) {
-          toast.error("You don't have permission to access this page");
-          navigate("/");
+        if (requireAdmin) {
+          const userDoc = await getDoc(doc(db, "users", user.uid));
+          const userData = userDoc.data();
+          
+          if (!userData || userData.role !== "admin") {
+            toast.error("Unauthorized access. Admin privileges required.");
+            navigate("/");
+            return;
+          }
         }
+
+        setIsAuthorized(true);
+      } catch (error) {
+        console.error("Auth check error:", error);
+        toast.error("Authentication error");
+        navigate("/");
+      } finally {
+        setIsLoading(false);
       }
-    };
+    });
 
-    checkUserRole();
-  }, [user, navigate, requiredRole]);
+    return () => unsubscribe();
+  }, [navigate, requireAdmin]);
 
-  if (!user) return null;
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
 
-  return <>{children}</>;
-}
+  return isAuthorized ? <>{children}</> : null;
+} 

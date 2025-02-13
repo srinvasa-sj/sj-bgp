@@ -84,7 +84,7 @@ const ProductForm = () => {
         productCategory: formData.productCategory, // Changed to match formData
       };
 
-      const docRef = doc(db, "productData", "UelsUgCcOKCYUVPV2dRC");
+      const docRef = doc(db, "productData", "zzeEfRyePYTdWemfHHWH");
       await updateDoc(docRef, {
         products: arrayUnion(productData)
       });

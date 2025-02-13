@@ -29,7 +29,7 @@ const PriceUpdateForm = () => {
       }), {});
 
       // Add timestamp when updating prices
-      await setDoc(doc(db, "priceData", "OTjdBq7kTmGMXWDpMKvg"), {
+      await setDoc(doc(db, "priceData", "4OhZCKHQls64bokVqGN5"), {
         ...numericFormData,
         timestamp: serverTimestamp()
       });

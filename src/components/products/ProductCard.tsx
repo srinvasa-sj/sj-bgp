@@ -41,7 +41,7 @@ const ProductCard = ({ product, onAddToWishlist, isInWishlist, activePromotion }
   const calculatePrices = async () => {
     setIsLoading(true);
     try {
-      const priceDocRef = doc(db, "priceData", "OTjdBq7kTmGMXWDpMKvg");
+      const priceDocRef = doc(db, "priceData", "4OhZCKHQls64bokVqGN5");
       const priceDocSnap = await getDoc(priceDocRef);
       
       if (!priceDocSnap.exists()) {

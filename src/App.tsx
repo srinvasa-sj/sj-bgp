@@ -1,4 +1,3 @@
-
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Toaster as RadixToaster } from "@/components/ui/toaster";
@@ -14,6 +13,8 @@ import Login from "./pages/Login";
 import Admin from "./pages/Admin";
 import ProductDetails from "./pages/ProductDetails";
 import ProductManagement from "./pages/ProductManagement"; // Ensure correct file name with casing
+import Reports from "@/pages/admin/Reports";
+import ProtectedRoute from "@/components/ProtectedRoute";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -47,8 +48,9 @@ const App = () => {
               <Route path="product/:productName" element={<ProductDetails />} />
               <Route path="contact" element={<Contact />} />
               <Route path="login" element={<Login />} />
-              <Route path="admin" element={<Admin />} />
+              <Route path="admin" element={<ProtectedRoute requireAdmin><Admin /></ProtectedRoute>} />
               <Route path="admin/products" element={<ProductManagement />} />
+              <Route path="admin/reports" element={<ProtectedRoute requireAdmin><Reports /></ProtectedRoute>} />
             </Route>
           </Routes>
         </BrowserRouter>

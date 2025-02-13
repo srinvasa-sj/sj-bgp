@@ -1,6 +1,3 @@
-
-
-
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { auth, db } from "@/lib/firebase";
@@ -20,7 +17,7 @@ import AddImage from "@/components/admin/addimage";
 import {
   Users, ShoppingBag, Package, Star,
   MessageSquare, Bell, FileText,
-  Settings, User, LogOut
+  Settings, User, LogOut, BarChart3
 } from "lucide-react";
 import {
   Dialog,
@@ -72,7 +69,7 @@ const Admin = () => {
           setNewImageUrl(data.profileImageUrl || "");
         }
 
-        const productsDoc = await getDoc(doc(db, "productData", "UelsUgCcOKCYUVPV2dRC"));
+        const productsDoc = await getDoc(doc(db, "productData", "zzeEfRyePYTdWemfHHWH"));
         if (productsDoc.exists()) {
           setProducts(productsDoc.data().products || []);
         }
@@ -84,7 +81,7 @@ const Admin = () => {
         } as CustomerData));
         setCustomers(customersList);
 
-        const priceDoc = await getDoc(doc(db, "priceData", "OTjdBq7kTmGMXWDpMKvg"));
+        const priceDoc = await getDoc(doc(db, "priceData", "4OhZCKHQls64bokVqGN5"));
         if (priceDoc.exists()) {
           setPriceData(priceDoc.data());
           setPriceUpdateTime(new Date(priceDoc.data().timestamp?.toDate()).toLocaleString() || "N/A");
@@ -177,9 +174,9 @@ const Admin = () => {
       title: "New Reports",
       value: 0,
       color: "bg-[#8E9196]",
-      icon: FileText,
-      link: "#reports",
-      description: "Awaiting response"
+      icon: BarChart3,
+      link: "/admin/reports",
+      description: "View product analytics and reports"
     }
   ];
 

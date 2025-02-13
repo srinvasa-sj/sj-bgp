@@ -31,7 +31,7 @@
 //   const fetchProducts = async () => {
 //     try {
 //       console.log("Fetching products...");
-//       const docRef = doc(db, "productData", "UelsUgCcOKCYUVPV2dRC");
+//       const docRef = doc(db, "productData", "zzeEfRyePYTdWemfHHWH");
 //       const docSnap = await getDoc(docRef);
       
 //       if (docSnap.exists() && docSnap.data().products) {
@@ -58,7 +58,7 @@
 
 //   const handleDelete = async (productName: string) => {
 //     try {
-//       const docRef = doc(db, "productData", "UelsUgCcOKCYUVPV2dRC");
+//       const docRef = doc(db, "productData", "zzeEfRyePYTdWemfHHWH");
 //       const updatedProducts = products.filter(p => p.name !== productName);
 //       await updateDoc(docRef, {
 //         products: updatedProducts
@@ -74,7 +74,7 @@
 //   const handleUpdate = async (updatedProduct: Product) => {
 //     try {
 //       console.log("Updating product:", updatedProduct);
-//       const docRef = doc(db, "productData", "UelsUgCcOKCYUVPV2dRC");
+//       const docRef = doc(db, "productData", "zzeEfRyePYTdWemfHHWH");
 //       const updatedProducts = products.map(p => 
 //         p.name === originalName ? {
 //           ...updatedProduct,
@@ -343,7 +343,7 @@
 
 //   const fetchProducts = async () => {
 //     try {
-//       const docRef = doc(db, "productData", "UelsUgCcOKCYUVPV2dRC");
+//       const docRef = doc(db, "productData", "zzeEfRyePYTdWemfHHWH");
 //       const docSnap = await getDoc(docRef);
 //       if (docSnap.exists() && docSnap.data().products) {
 //         setProducts(docSnap.data().products);
@@ -363,7 +363,7 @@
 
 //   const handleDelete = async (productName: string) => {
 //     try {
-//       const docRef = doc(db, "productData", "UelsUgCcOKCYUVPV2dRC");
+//       const docRef = doc(db, "productData", "zzeEfRyePYTdWemfHHWH");
 //       const updatedProducts = products.filter((p) => p.name !== productName);
 //       await updateDoc(docRef, { products: updatedProducts });
 //       setProducts(updatedProducts);
@@ -377,7 +377,7 @@
 //   const handleUpdate = async () => {
 //     if (!editingProduct) return;
 //     try {
-//       const docRef = doc(db, "productData", "UelsUgCcOKCYUVPV2dRC");
+//       const docRef = doc(db, "productData", "zzeEfRyePYTdWemfHHWH");
 //       const updatedProducts = products.map((p) =>
 //         p.name === originalName ? { ...editingProduct, imageUrl: editingProduct.imageUrls[0] } : p
 //       );
@@ -510,7 +510,7 @@ const ProductManagement = () => {
 
   const fetchProducts = async () => {
     try {
-      const docRef = doc(db, "productData", "UelsUgCcOKCYUVPV2dRC");
+      const docRef = doc(db, "productData", "zzeEfRyePYTdWemfHHWH");
       const docSnap = await getDoc(docRef);
       if (docSnap.exists() && docSnap.data().products) {
         setProducts(docSnap.data().products);
@@ -535,7 +535,7 @@ const ProductManagement = () => {
 
   const handleDelete = async (productName: string) => {
     try {
-      const docRef = doc(db, "productData", "UelsUgCcOKCYUVPV2dRC");
+      const docRef = doc(db, "productData", "zzeEfRyePYTdWemfHHWH");
       const updatedProducts = products.filter((p) => p.name !== productName);
       await updateDoc(docRef, { products: updatedProducts });
       setProducts(updatedProducts);
@@ -556,7 +556,7 @@ const ProductManagement = () => {
         imageUrl: editingProduct.imageUrls[0], // Ensure imageUrl is the first in the array
       };
 
-      const docRef = doc(db, "productData", "UelsUgCcOKCYUVPV2dRC");
+      const docRef = doc(db, "productData", "zzeEfRyePYTdWemfHHWH");
       const updatedProducts = products.map((p) =>
         p.productID === editingProduct.productID ? updatedProduct : p
       );
