@@ -120,12 +120,12 @@ const ProductDetails = () => {
           basePrice = priceData.price24Karat;
           applyWastageMakingCharges = false;
           break;
-        case "Fine Silver-99.9%":
+        case "Silver 999":
           basePrice = priceData.priceSilver1;
           wastagePercentage = priceData.wastageChargesSilver;
           makingChargesPerGram = priceData.makingChargesSilver;
           break;
-        case "Sterling Silver-92.5%":
+        case "Silver 925":
           basePrice = priceData.priceSilver2;
           wastagePercentage = priceData.wastageChargesSilver;
           makingChargesPerGram = priceData.makingChargesSilver;

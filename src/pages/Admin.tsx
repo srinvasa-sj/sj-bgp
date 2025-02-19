@@ -17,7 +17,8 @@ import AddImage from "@/components/admin/addimage";
 import {
   Users, ShoppingBag, Package, Star,
   MessageSquare, Bell, FileText,
-  Settings, User, LogOut, BarChart3
+  Settings, User, LogOut, BarChart3,
+  FolderTree
 } from "lucide-react";
 import {
   Dialog,
@@ -37,6 +38,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import type { Category } from "@/types/category";
 
 const Admin = () => {
   const navigate = useNavigate();
@@ -51,6 +53,9 @@ const Admin = () => {
   const [newImageUrl, setNewImageUrl] = useState("");
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [totalUsers, setTotalUsers] = useState<number>(0);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [mainCategories, setMainCategories] = useState(0);
+  const [subCategories, setSubCategories] = useState(0);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -89,6 +94,15 @@ const Admin = () => {
 
         const usersSnapshot = await getDocs(collection(db, "users"));
         setTotalUsers(usersSnapshot.size);
+
+        const categoriesSnapshot = await getDocs(collection(db, "categories"));
+        const categoriesList = categoriesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Category);
+        setCategories(categoriesList);
+        
+        const main = categoriesList.filter(cat => !cat.parentId).length;
+        const sub = categoriesList.length - main;
+        setMainCategories(main);
+        setSubCategories(sub);
       } catch (error) {
         console.error("Error fetching data:", error);
         toast.error("Error fetching data");
@@ -177,7 +191,24 @@ const Admin = () => {
       icon: BarChart3,
       link: "/admin/reports",
       description: "View product analytics and reports"
+    },
+    {
+      title: "Categories",
+      value: categories.length,
+      color: "bg-[#7E69AB]",
+      icon: FolderTree,
+      link: "/admin/categories",
+      description: `${mainCategories} main, ${subCategories} sub-categories`
     }
+  ];
+
+  const navigationItems = [
+    {
+      name: "Categories",
+      icon: FolderTree,
+      href: "/admin/categories",
+      description: "Manage product categories and attributes"
+    },
   ];
 
   return (
@@ -316,12 +347,12 @@ const Admin = () => {
             </div>
             {showPromotionForm && (
               <div className="overflow-x-auto">
-                <PromotionForm products={products} />
-              </div>
+                  <PromotionForm products={products} />
+                </div>
             )}
-            <div className="overflow-x-auto">
-              <PromotionList />
-            </div>
+                <div className="overflow-x-auto">
+                  <PromotionList />
+                </div>
           </div>
 
           <div className="bg-white rounded-lg shadow-md p-4">

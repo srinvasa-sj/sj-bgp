@@ -6,6 +6,10 @@ import { Input } from "@/components/ui/input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { PromotionNews } from "@/components/promotions/PromotionNews";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { InfoIcon } from "lucide-react";
+import { PRICE_FIELDS, WASTAGE_FIELDS, MAKING_CHARGES_FIELDS, PURITY_OPTIONS } from '@/constants/materials';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const Home = () => {
   const [priceData, setPriceData] = useState<any>(null);
@@ -15,6 +19,16 @@ const Home = () => {
     goldWeight: "",
     silverType: "",
     silverWeight: "",
+  });
+  const [previewCalc, setPreviewCalc] = useState({
+    goldTotal: 0,
+    silverTotal: 0,
+    goldBase: 0,
+    silverBase: 0,
+    goldMaking: 0,
+    silverMaking: 0,
+    goldWastage: 0,
+    silverWastage: 0
   });
 
   useEffect(() => {
@@ -31,6 +45,53 @@ const Home = () => {
     };
     fetchPriceData();
   }, []);
+
+  // Calculate preview amounts when weight or type changes
+  useEffect(() => {
+    if (priceData && (formData.goldWeight || formData.silverWeight)) {
+      let goldTotal = 0, silverTotal = 0, goldBase = 0, silverBase = 0;
+      let goldMaking = 0, silverMaking = 0, goldWastage = 0, silverWastage = 0;
+
+      // Gold calculations
+      if (formData.goldType && formData.goldWeight) {
+        const goldWeight = parseFloat(formData.goldWeight) || 0;
+        const priceField = PRICE_FIELDS['Gold'][formData.goldType as keyof (typeof PRICE_FIELDS)['Gold']];
+        const goldPricePerGram = priceData[priceField];
+
+        goldBase = goldPricePerGram * goldWeight;
+        
+        // Only apply wastage and making charges if not 24 Karat
+        if (formData.goldType !== '24 Karat') {
+          goldWastage = goldBase * (priceData.goldwastageCharges / 100);
+          goldMaking = priceData.goldmakingCharges * goldWeight;
+        }
+        goldTotal = goldBase + goldWastage + goldMaking;
+      }
+
+      // Silver calculations
+      if (formData.silverType && formData.silverWeight) {
+        const silverWeight = parseFloat(formData.silverWeight) || 0;
+        const priceField = PRICE_FIELDS['Silver'][formData.silverType as keyof (typeof PRICE_FIELDS)['Silver']];
+        const silverPricePerGram = priceData[priceField];
+
+        silverBase = silverPricePerGram * silverWeight;
+        silverWastage = silverBase * (priceData.wastageChargesSilver / 100);
+        silverMaking = priceData.makingChargesSilver * silverWeight;
+        silverTotal = silverBase + silverWastage + silverMaking;
+      }
+
+      setPreviewCalc({
+        goldTotal,
+        silverTotal,
+        goldBase,
+        silverBase,
+        goldMaking,
+        silverMaking,
+        goldWastage,
+        silverWastage
+      });
+    }
+  }, [formData, priceData]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -53,28 +114,12 @@ const Home = () => {
         // Calculate Gold Price if provided
         if (formData.goldType && formData.goldWeight) {
           const goldWeight = parseFloat(formData.goldWeight);
-          let goldPricePerGram = 0;
-          let applyWastageMakingCharges = true;
-
-          switch (formData.goldType) {
-            case "18-Karat":
-              goldPricePerGram = priceData.price18Karat;
-              break;
-            case "20-Karat":
-              goldPricePerGram = priceData.price20Karat;
-              break;
-            case "22-Karat":
-              goldPricePerGram = priceData.price22Karat;
-              break;
-            case "24-Karat":
-              goldPricePerGram = priceData.price24Karat;
-              applyWastageMakingCharges = false;
-              break;
-          }
-
+          const priceField = PRICE_FIELDS['Gold'][formData.goldType as keyof (typeof PRICE_FIELDS)['Gold']];
+          const goldPricePerGram = priceData[priceField];
           const goldPriceForWeight = goldPricePerGram * goldWeight;
-          const baseGoldPrice = goldPricePerGram * goldWeight; // Added base price for gold
-          if (applyWastageMakingCharges) {
+          const baseGoldPrice = goldPriceForWeight;
+
+          if (formData.goldType !== '24 Karat') {
             const wastageChargesGold = goldPriceForWeight * (priceData.goldwastageCharges / 100);
             const makingChargesGold = priceData.goldmakingCharges * goldWeight;
             totalGoldPrice = goldPriceForWeight + wastageChargesGold + makingChargesGold;
@@ -161,12 +206,10 @@ const Home = () => {
         // Calculate Silver Price if provided
         if (formData.silverType && formData.silverWeight) {
           const silverWeight = parseFloat(formData.silverWeight);
-          let silverPricePerGram = formData.silverType === "silver-1" 
-            ? priceData.priceSilver1 
-            : priceData.priceSilver2;
-
+          const priceField = PRICE_FIELDS['Silver'][formData.silverType as keyof (typeof PRICE_FIELDS)['Silver']];
+          const silverPricePerGram = priceData[priceField];
           const silverPriceForWeight = silverPricePerGram * silverWeight;
-          const baseSilverPrice = silverPricePerGram * silverWeight; // Added base price for silver
+          const baseSilverPrice = silverPriceForWeight;
           const wastageChargesSilver = silverPriceForWeight * (priceData.wastageChargesSilver / 100);
           const makingChargesSilver = priceData.makingChargesSilver * silverWeight;
           totalSilverPrice = silverPriceForWeight + wastageChargesSilver + makingChargesSilver;
@@ -262,111 +305,179 @@ const Home = () => {
 
         {/* Price Details Section */}
         {priceData && (
-          <section className="mb-8 sm:mb-12">
-            <h2 className="text-xl sm:text-2xl md:text-3xl font-bold mb-6">
-              Today's Price Details /gram
+          <section className="mb-8 sm:mb-12 rounded-xl p-6">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl sm:text-2xl md:text-3xl font-bold">
+                Today's Price Details
             </h2>
-            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-6 gap-3">
+              <div className="text-sm text-muted-foreground">
+                Last Updated: {new Date().toLocaleTimeString()}
+              </div>
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-6 gap-4">
               {[
-                { label: "18K", value: priceData.price18Karat },
-                { label: "20K", value: priceData.price20Karat },
-                { label: "22K", value: priceData.price22Karat },
-                { label: "24K", value: priceData.price24Karat },
-                { label: "Silver 1", value: priceData.priceSilver1 },
-                { label: "Silver 2", value: priceData.priceSilver2 }
+                ...PURITY_OPTIONS['Gold'].map(purity => ({
+                  label: purity,
+                  value: priceData[PRICE_FIELDS['Gold'][purity as keyof (typeof PRICE_FIELDS)['Gold']]],
+                  color: "amber",
+                  info: {
+                    '24 Karat': '99.9% pure gold, highest purity level. Best for investment but too soft for jewelry.',
+                    '22 Karat': '91.6% pure gold, traditional choice for Indian jewelry. Ideal for special occasions.',
+                    '20 Karat': '83.3% pure gold, offering higher purity while maintaining good durability.',
+                    '18 Karat': '75% pure gold, suitable for daily wear jewelry. Good balance of durability and gold content.'
+                  }[purity]
+                })),
+                ...PURITY_OPTIONS['Silver'].map(purity => ({
+                  label: purity,
+                  value: priceData[PRICE_FIELDS['Silver'][purity as keyof (typeof PRICE_FIELDS)['Silver']]],
+                  color: "gray",
+                  info: {
+                    'Silver 999': '99.9% pure silver, highest quality. Used in industrial applications and premium jewelry.',
+                    'Silver 925': '92.5% pure silver (Sterling Silver). Most common for jewelry due to durability and shine.'
+                  }[purity]
+                }))
               ].map((item, index) => (
                 <div
                   key={index}
-                  className="bg-card p-4 rounded-lg shadow-md hover:shadow-lg transition-shadow"
+                  className={`bg-white/50 backdrop-blur-sm p-4 rounded-lg shadow-sm hover:shadow-md transition-all duration-300 border ${
+                    item.color === 'amber' ? 'border-amber-100 hover:border-amber-300' : 'border-gray-100 hover:border-gray-300'
+                  }`}
                 >
-                  <h3 className="text-sm sm:text-base font-semibold text-foreground mb-1">
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger className="w-full text-left">
+                        <div>
+                          <h3 className={`text-sm sm:text-base font-semibold ${
+                            item.color === 'amber' ? 'text-amber-700' : 'text-gray-700'
+                          }`}>
                     {item.label}
                   </h3>
-                  <p className="text-base sm:text-lg md:text-xl font-bold text-primary">
-                    ₹{item.value?.toFixed(2)}
-                  </p>
+                          <p className={`text-base sm:text-lg md:text-xl font-bold ${
+                            item.color === 'amber' ? 'text-amber-600' : 'text-gray-600'
+                          }`}>
+                            ₹{item.value?.toFixed(2)}/g
+                          </p>
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom" className="max-w-[200px] text-sm p-2">
+                        {item.info}
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                 </div>
               ))}
             </div>
           </section>
         )}
 
-        {/* Calculator Section with reduced width on mobile */}
+        {/* Calculator Section */}
         <section className="mb-8 sm:mb-12">
           <div className="bg-card p-3 sm:p-6 md:p-8 rounded-xl shadow-lg w-[95%] sm:max-w-6xl mx-auto">
             <h2 className="text-xl sm:text-2xl md:text-3xl font-bold mb-6">
               Gold and Silver Price Calculator
             </h2>
-            <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Gold Section */}
+
+            <form onSubmit={handleSubmit} className="space-y-8">
+              {/* Gold Calculator Section */}
+              <div className="bg-amber-50/50 p-4 rounded-lg border border-amber-100">
+                <h3 className="text-lg font-semibold text-amber-700 mb-4">Gold Calculator</h3>
               <div className="space-y-4">
+                  <div>
                 <Label className="text-base sm:text-lg block mb-2">Gold Purity</Label>
                 <RadioGroup
                   value={formData.goldType}
-                  onValueChange={(value) => setFormData({ ...formData, goldType: value })}
-                  className="grid grid-cols-2 sm:flex sm:flex-wrap gap-4"
+                      onValueChange={(value) => setFormData(prev => ({ ...prev, goldType: value }))}
+                      className="grid grid-cols-2 sm:grid-cols-4 gap-4"
                 >
-                  {["18-Karat", "20-Karat", "22-Karat", "24-Karat"].map((type) => (
-                    <div key={type} className="flex items-center space-x-2">
-                      <RadioGroupItem value={type} id={type} />
-                      <Label htmlFor={type} className="text-sm sm:text-base">
-                        {type.replace("-", " ")}
+                      {PURITY_OPTIONS['Gold'].map((purity) => (
+                        <div key={purity} className="flex items-center space-x-2 bg-white p-2 rounded-md border border-amber-100">
+                          <RadioGroupItem value={purity} id={`gold-${purity}`} />
+                          <Label htmlFor={`gold-${purity}`} className="text-sm sm:text-base cursor-pointer">
+                            {purity}
                       </Label>
                     </div>
                   ))}
                 </RadioGroup>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="goldWeight" className="text-base sm:text-lg block">
+                  <div className="grid sm:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="goldWeight" className="text-base sm:text-lg block mb-2">
                   Gold Weight (grams)
                 </Label>
                 <Input
                   id="goldWeight"
                   type="number"
-                  step="any"
+                        step="0.001"
+                        min="0"
+                        placeholder="Enter weight in grams"
                   value={formData.goldWeight}
                   onChange={(e) => setFormData({ ...formData, goldWeight: e.target.value })}
                   className="w-full"
                 />
+                      {formData.goldWeight && formData.goldType && (
+                        <div className="mt-2 text-amber-700 font-medium">
+                          Expected Total: ₹{previewCalc.goldTotal.toFixed(2)}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
               </div>
 
-              {/* Silver Section */}
+              {/* Silver Calculator Section */}
+              <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                <h3 className="text-lg font-semibold text-gray-700 mb-4">Silver Calculator</h3>
               <div className="space-y-4">
+                  <div>
                 <Label className="text-base sm:text-lg block mb-2">Silver Purity</Label>
                 <RadioGroup
                   value={formData.silverType}
-                  onValueChange={(value) => setFormData({ ...formData, silverType: value })}
+                      onValueChange={(value) => setFormData(prev => ({ ...prev, silverType: value }))}
                   className="grid grid-cols-2 gap-4"
                 >
-                  {["Silver 999", "Silver 925"].map((type) => (
-                    <div key={type} className="flex items-center space-x-2">
-                      <RadioGroupItem value={type} id={type} />
-                      <Label htmlFor={type} className="text-sm sm:text-base">
-                        {type}
+                      {PURITY_OPTIONS['Silver'].map((purity) => (
+                        <div key={purity} className="flex items-center space-x-2 bg-white p-2 rounded-md border border-gray-200">
+                          <RadioGroupItem value={purity} id={`silver-${purity}`} />
+                          <Label htmlFor={`silver-${purity}`} className="text-sm sm:text-base cursor-pointer">
+                            {purity}
                       </Label>
                     </div>
                   ))}
                 </RadioGroup>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="silverWeight" className="text-base sm:text-lg block">
+                  <div>
+                    <Label htmlFor="silverWeight" className="text-base sm:text-lg block mb-2">
                   Silver Weight (grams)
                 </Label>
                 <Input
                   id="silverWeight"
                   type="number"
-                  step="any"
+                      step="0.001"
+                      min="0"
+                      placeholder="Enter weight in grams"
                   value={formData.silverWeight}
                   onChange={(e) => setFormData({ ...formData, silverWeight: e.target.value })}
                   className="w-full"
                 />
+                    {formData.silverWeight && formData.silverType && (
+                      <div className="mt-2 text-gray-700 font-medium">
+                        Expected Total: ₹{previewCalc.silverTotal.toFixed(2)}
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
 
-              <Button type="submit" className="w-full sm:w-auto">
+              <div className="flex justify-center">
+                <Button 
+                  type="submit" 
+                  className="w-full sm:w-auto min-w-[200px] bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700"
+                >
                 Calculate Price
               </Button>
+              </div>
             </form>
           </div>
         </section>

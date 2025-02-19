@@ -1,6 +1,7 @@
 import { initializeApp } from "firebase/app";
-import { getAuth, browserLocalPersistence, setPersistence } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+import { getAuth, setPersistence, browserLocalPersistence } from "firebase/auth";
+import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "firebase/firestore";
+import { getStorage } from "firebase/storage";
 import { toast } from "sonner";
 
 const firebaseConfig = {
@@ -14,26 +15,27 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
 
-const setupFirebase = async () => {
-  try {
-    // Set auth persistence
-    await setPersistence(auth, browserLocalPersistence);
+// Initialize auth with persistence
+export const auth = getAuth(app);
+setPersistence(auth, browserLocalPersistence)
+  .catch((error) => {
+    console.warn("Auth persistence error:", error);
+  });
 
-    // No emulator connection code here, Firebase will use real services
-    console.log("Connected to Firebase services");
+// Initialize Firestore with persistent cache and multi-tab support
+export const db = initializeFirestore(app, {
+  cache: persistentLocalCache({
+    tabManager: persistentMultipleTabManager()
+  })
+});
 
-  } catch (error) {
-    console.error("Error setting up Firebase:", error);
-    toast.error('Error initializing application. Please refresh the page.');
-  }
-};
+// Initialize storage
+export const storage = getStorage(app);
 
-setupFirebase().catch(console.error);
+console.log('Connected to Firebase services');
 
-export { auth, db };
+export default app;
 
 
 

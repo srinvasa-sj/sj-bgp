@@ -1,5 +1,4 @@
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { toast } from "sonner";
@@ -30,13 +29,20 @@ interface ProductCardProps {
   onAddToWishlist: (product: Product) => void;
   isInWishlist: boolean;
   activePromotion?: Promotion;
+  onView?: () => void;
 }
 
-const ProductCard = ({ product, onAddToWishlist, isInWishlist, activePromotion }: ProductCardProps) => {
+const ProductCard = ({ product, onAddToWishlist, isInWishlist, activePromotion, onView }: ProductCardProps) => {
   const [originalPrice, setOriginalPrice] = useState<number | null>(null);
   const [promotionPrice, setPromotionPrice] = useState<number | null>(null);
   const [showPrice, setShowPrice] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    if (onView) {
+      onView();
+    }
+  }, [onView]);
 
   const calculatePrices = async () => {
     setIsLoading(true);
@@ -75,13 +81,13 @@ const ProductCard = ({ product, onAddToWishlist, isInWishlist, activePromotion }
           basePrice = priceData.price24Karat;
           applyWastageMakingCharges = false;
           break;
-        case "Fine Silver-99.9%":
-          basePrice = priceData.priceSilver1;
+        case "Silver 999":
+          basePrice = priceData.priceSilver999;
           wastagePercentage = priceData.wastageChargesSilver;
           makingChargesPerGram = priceData.makingChargesSilver;
           break;
-        case "Sterling Silver-92.5%":
-          basePrice = priceData.priceSilver2;
+        case "Silver 925":
+          basePrice = priceData.priceSilver925;
           wastagePercentage = priceData.wastageChargesSilver;
           makingChargesPerGram = priceData.makingChargesSilver;
           break;
