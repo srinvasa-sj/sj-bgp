@@ -1,24 +1,26 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
-import { collection, getDocs, query, orderBy, doc, getDoc } from "firebase/firestore";
+import { useState, useEffect, useMemo, useCallback, memo, useRef, Suspense, useLayoutEffect } from "react";
+import { collection, getDocs, query, orderBy, doc, getDoc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import ProductCard from "@/components/products/ProductCard";
-import { useSearchParams } from "react-router-dom";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Slider } from "@/components/ui/slider";
-import { Category } from "@/types/category";
-import { useProductSearch } from '../hooks/useProductSearch';
-import { useRecommendations } from '../hooks/useRecommendations';
 import { useAuth } from '../hooks/useAuth';
-import debounce from 'lodash/debounce';
-import { searchService } from '../services/searchService';
+import { useRecommendations } from '../hooks/useRecommendations';
+import { FilterBar, ProductFilters } from '@/components/products/FilterBar';
+import { Category } from "@/types/category";
+import { useLocation } from "react-router-dom";
+import { debounce } from "lodash";
+import { useVirtualizer } from '@tanstack/react-virtual';
+import { useQuery, useQueries } from '@tanstack/react-query';
+import { batch } from 'react-redux';
+
+// Performance metrics are now using window.performance instead of perf_hooks
+
+const MATERIALS = ['Gold', 'Silver'];
+const PURITIES = [
+  '18 Karat', '20 Karat', '22 Karat', '24 Karat',
+  'Silver 999', 'Silver 925'
+];
 
 interface Product {
   name: string;
@@ -33,6 +35,13 @@ interface Product {
     seconds: number;
     nanoseconds: number;
   };
+  createdAt?: {
+    seconds: number;
+    nanoseconds: number;
+  };
+  viewCount?: number;
+  lastViewed?: string;
+  calculatedPrice?: number;
 }
 
 interface Promotion {
@@ -46,18 +55,69 @@ interface Promotion {
   productName: string;
 }
 
+// Memoize the ProductCard component
+const MemoizedProductCard = memo(ProductCard);
+
+// Add price lookup table at module level for faster access
+const PRICE_MULTIPLIERS = {
+  "18 Karat": { baseMultiplier: 0.75, wastageDefault: 8, makingDefault: 12 },
+  "20 Karat": { baseMultiplier: 0.833, wastageDefault: 8, makingDefault: 12 },
+  "22 Karat": { baseMultiplier: 0.916, wastageDefault: 8, makingDefault: 12 },
+  "24 Karat": { baseMultiplier: 1, wastageDefault: 0, makingDefault: 0 },
+  "Silver 999": { baseMultiplier: 0.999, wastageDefault: 5, makingDefault: 8 },
+  "Silver 925": { baseMultiplier: 0.925, wastageDefault: 5, makingDefault: 8 }
+};
+
+// Add global cache
+const globalCache = {
+  products: new Map<string, Product[]>(),
+  priceData: new Map<string, any>(),
+  categories: new Map<string, Category[]>(),
+  prices: new Map<string, number>()
+};
+
+// Add matchesSearch as a utility function outside the component
+const matchesSearchUtil = (product: Product, query: string, fields: string[]) => {
+  const searchValue = query.toLowerCase();
+  return fields.some(field => {
+    const value = (product as any)[field];
+    if (typeof value === 'number') {
+      return value.toString().includes(searchValue);
+    }
+    if (typeof value === 'string') {
+      return value.toLowerCase().includes(searchValue);
+    }
+    return false;
+  });
+};
+
+// Add price sorting helper function outside component
+const sortProductsByPrice = (products: Product[], sortBy: string, calculatePrice: (product: Product) => number) => {
+  console.log('Sorting products by price:', { sortBy, productCount: products.length });
+  
+  // First ensure all products have calculated prices
+  const productsWithPrices = products.map(product => {
+    const price = calculatePrice(product);
+    console.log(`Product ${product.productID}: ${price}`);
+    return {
+      ...product,
+      calculatedPrice: price
+    };
+  });
+
+  // Sort based on calculated prices
+  const sortedProducts = productsWithPrices.sort((a, b) => {
+    const priceA = a.calculatedPrice || 0;
+    const priceB = b.calculatedPrice || 0;
+    return sortBy === 'price_asc' ? priceA - priceB : priceB - priceA;
+  });
+
+  console.log('Sorted products:', sortedProducts.map(p => ({ id: p.productID, price: p.calculatedPrice })));
+  return sortedProducts;
+};
+
 const Products = () => {
   const { user } = useAuth();
-  const {
-    searchResult,
-    isLoading: isSearchLoading,
-    error: searchError,
-    searchProducts,
-    filters,
-    options,
-    updateSearchParams
-  } = useProductSearch();
-
   const {
     recommendations,
     isLoading: isRecommendationsLoading,
@@ -65,448 +125,605 @@ const Products = () => {
   } = useRecommendations(user?.uid || null);
 
   const [products, setProducts] = useState<Product[]>([]);
-  const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [wishlist, setWishlist] = useState<Product[]>([]);
   const [showWishlist, setShowWishlist] = useState(false);
-  const [searchParams] = useSearchParams();
   const [promotions, setPromotions] = useState<{ [key: string]: Promotion }>({});
-  const [priceRanges, setPriceRanges] = useState<{ [key: string]: number }>({});
+  const [currentPage, setCurrentPage] = useState(1);
   const [categories, setCategories] = useState<Category[]>([]);
-
-  // Advanced filtering states
-  const [selectedCategory, setSelectedCategory] = useState<string>("all");
-  const [selectedMaterial, setSelectedMaterial] = useState<string>("all");
-  const [selectedPurity, setSelectedPurity] = useState<string>("all");
-  const [priceRange, setPriceRange] = useState<[number, number]>([0, 1000000]);
+  const itemsPerPage = 100;
 
   const [currentProductId, setCurrentProductId] = useState<string | null>(null);
 
-  const materials = ["Gold", "Silver"];
-  const purities = {
-    Gold: ["18 Karat", "20 Karat", "22 Karat", "24 Karat"],
-    Silver: ["Silver 999", "Silver 925"]
-  };
+  const [filters, setFilters] = useState<ProductFilters>({
+    sortBy: 'default'
+  });
 
-  const [popularityCache, setPopularityCache] = useState<{ [key: string]: number }>({});
+  const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
+  const [isFiltering, setIsFiltering] = useState(false);
 
-  const fetchCategories = async () => {
-    try {
-      const categoriesRef = collection(db, "categories");
-      const q = query(categoriesRef, orderBy("sortOrder"));
-      const querySnapshot = await getDocs(q);
-      const fetchedCategories = querySnapshot.docs.map(doc => ({ 
-        id: doc.id, 
-        ...doc.data() 
-      })) as Category[];
-      setCategories(fetchedCategories);
-    } catch (error) {
-      console.error("Error fetching categories:", error);
-      toast.error("Error loading categories");
-    }
-  };
+  // Add new state for header filtering
+  const [headerFilteredProducts, setHeaderFilteredProducts] = useState<Product[]>([]);
+  const location = useLocation();
 
-  const getSubcategoryIds = (categoryId: string): string[] => {
-    const subcategories = categories.filter(cat => cat.id === categoryId);
-    let allSubcategoryIds = [categoryId];
-    
-    subcategories.forEach(subcat => {
-      allSubcategoryIds = [...allSubcategoryIds, ...getSubcategoryIds(subcat.id)];
-    });
-    
-    return allSubcategoryIds;
-  };
+  const priceCache = useRef<{ [key: string]: number }>({});
+  const [priceData, setPriceData] = useState<any>(null);
 
-  const fetchPromotions = async () => {
-    try {
-      const promotionsSnapshot = await getDocs(collection(db, "promotions"));
-      const currentDate = new Date();
-      const activePromotions: { [key: string]: Promotion } = {};
+  // Add new state for price-sorted products
+  const [priceSortedProducts, setPriceSortedProducts] = useState<Product[]>([]);
 
-      promotionsSnapshot.forEach((doc) => {
-        const promoData = doc.data() as Promotion;
-        const startDate = new Date(promoData.startDate);
-        const endDate = new Date(promoData.endDate);
-        
-        if (currentDate >= startDate && currentDate <= endDate) {
-          activePromotions[promoData.productName] = promoData;
-        }
-      });
+  // Add performance tracking state
+  const [performanceMetrics, setPerformanceMetrics] = useState({
+    totalLoadTime: 0,
+    dataFetchTime: 0,
+    renderTime: 0,
+    initializationTime: 0
+  });
 
-      setPromotions(activePromotions);
-      console.log("Active promotions:", activePromotions);
-    } catch (error) {
-      console.error("Error fetching promotions:", error);
-    }
-  };
+  // Add performance tracking ref
+  const performanceRef = useRef({
+    startTime: 0,
+    dataFetchStart: 0,
+    renderStart: 0
+  });
 
-  useEffect(() => {
-    const fetchProducts = async () => {
-      try {
-        const docRef = doc(db, "productData", "zzeEfRyePYTdWemfHHWH");
-        const docSnap = await getDoc(docRef);
-
-        if (docSnap.exists() && docSnap.data().products) {
-          const productsData = docSnap.data().products;
-
-          // Sort products based on timestamp (newest first)
-          const sortedProducts = productsData.sort((a: Product, b: Product) => {
-            if (a.timestamp && b.timestamp) {
-              return b.timestamp.seconds - a.timestamp.seconds;
-            }
-            return 0;
-          });
-
-          setProducts(sortedProducts);
-          await fetchPromotions();
-          console.log("Products fetched:", sortedProducts);
-        } else {
-          console.log("No products found");
-          toast.error("No products available");
-        }
-        setIsLoading(false);
-      } catch (error) {
-        console.error("Error fetching products:", error);
-        toast.error("Error loading products");
-        setIsLoading(false);
-      }
-    };
-
-    const savedWishlist = localStorage.getItem('wishlist');
-    if (savedWishlist) {
-      setWishlist(JSON.parse(savedWishlist));
-    }
-
-    fetchProducts();
+  // Add at the start of the component
+  useLayoutEffect(() => {
+    performanceRef.current.startTime = window.performance.now();
+    console.log('Page load started at:', new Date().toISOString());
   }, []);
 
-  useEffect(() => {
-    const calculatePrices = async () => {
-      const priceDocRef = doc(db, "priceData", "4OhZCKHQls64bokVqGN5");
-      try {
-        const priceDocSnap = await getDoc(priceDocRef);
-        if (!priceDocSnap.exists()) return;
+  // Replace the calculatePrice function
+  const calculatePrice = useCallback((product: Product) => {
+    console.log('Calculating price for:', {
+      productId: product?.productID,
+      priceData: priceData,
+      material: product?.material,
+      purity: product?.purity,
+      weight: product?.weight
+    });
 
-        const priceData = priceDocSnap.data();
-        const prices: { [key: string]: number } = {};
+    if (!product?.productID || !priceData || !product?.purity || !product?.material || !product?.weight) {
+      return 0;
+    }
 
-        products.forEach((product) => {
-          let basePrice = 0;
-          let wastagePercentage = 0;
-          let makingChargesPerGram = 0;
-          let applyWastageMakingCharges = true;
+    try {
+      const multipliers = PRICE_MULTIPLIERS[product.purity as keyof typeof PRICE_MULTIPLIERS];
+      if (!multipliers) return 0;
 
-          switch (product.purity) {
-            case "18 Karat":
-              basePrice = priceData.price18Karat;
-              wastagePercentage = priceData.goldwastageCharges;
-              makingChargesPerGram = priceData.goldmakingCharges;
-              break;
-            case "20 Karat":
-              basePrice = priceData.price20Karat;
-              wastagePercentage = priceData.goldwastageCharges;
-              makingChargesPerGram = priceData.goldmakingCharges;
-              break;
-            case "22 Karat":
-              basePrice = priceData.price22Karat;
-              wastagePercentage = priceData.goldwastageCharges;
-              makingChargesPerGram = priceData.goldmakingCharges;
-              break;
-            case "24 Karat":
-              basePrice = priceData.price24Karat;
-              applyWastageMakingCharges = false;
-              break;
-            case "Silver 999":
-              basePrice = priceData.priceSilver999;
-              wastagePercentage = priceData.wastageChargesSilver;
-              makingChargesPerGram = priceData.makingChargesSilver;
-              break;
-            case "Silver 925":
-              basePrice = priceData.priceSilver2;
-              wastagePercentage = priceData.wastageChargesSilver;
-              makingChargesPerGram = priceData.makingChargesSilver;
-              break;
-            default:
-              return;
-          }
+      let basePrice = 0;
+      const weight = parseFloat(product.weight.toString()) || 0;
+      
+      if (weight <= 0) return 0;
 
-          const baseAmount = basePrice * product.weight;
-          let totalPrice = baseAmount;
-
-          if (applyWastageMakingCharges) {
-            const wastageCharges = baseAmount * (wastagePercentage / 100);
-            const makingCharges = makingChargesPerGram * product.weight;
-            totalPrice = baseAmount + wastageCharges + makingCharges;
-          }
-
-          const promotion = promotions[product.name];
-          if (promotion) {
-            const discountedBasePrice = basePrice * (1 - promotion.priceDiscount / 100);
-            const discountedWastage = applyWastageMakingCharges
-              ? baseAmount * ((wastagePercentage * (1 - promotion.wastageDiscount / 100)) / 100)
-              : 0;
-            const discountedMaking = applyWastageMakingCharges
-              ? makingChargesPerGram * (1 - promotion.makingChargesDiscount / 100) * product.weight
-              : 0;
-
-            totalPrice = discountedBasePrice * product.weight + discountedWastage + discountedMaking;
-          }
-
-          prices[product.name] = totalPrice;
+      // Get raw price from priceData
+      if (product.material === 'Gold') {
+        // Ensure we're accessing the correct property name from priceData
+        const goldPrice = priceData.goldPrice || priceData.price24Karat || priceData.price24K;
+        console.log('Gold price calculation:', {
+          rawPrice: goldPrice,
+          multiplier: multipliers.baseMultiplier
         });
-
-        setPriceRanges(prices);
-      } catch (error) {
-        console.error("Error calculating prices:", error);
+        if (!goldPrice) return 0;
+        basePrice = Number(goldPrice) * multipliers.baseMultiplier;
+      } else if (product.material === 'Silver') {
+        // Ensure we're accessing the correct property name from priceData
+        const silverPrice = priceData.silverPrice || priceData.priceSilver999 || priceData.silver999;
+        console.log('Silver price calculation:', {
+          rawPrice: silverPrice,
+          multiplier: multipliers.baseMultiplier
+        });
+        if (!silverPrice) return 0;
+        basePrice = Number(silverPrice) * multipliers.baseMultiplier;
       }
-    };
 
-    if (products.length > 0) {
-      calculatePrices();
-    }
-  }, [products, promotions]);
+      console.log('Base price calculated:', basePrice);
 
-  useEffect(() => {
-    const category = searchParams.get("category");
-    const search = searchParams.get("search");
+      if (basePrice <= 0) return 0;
 
-    let filtered = [...products];
+      const baseAmount = basePrice * weight;
+      const wastageCharges = baseAmount * (multipliers.wastageDefault / 100);
+      const makingCharges = multipliers.makingDefault * weight;
 
-    // Apply search filter
-    if (search) {
-      const searchLower = search.toLowerCase();
-      filtered = filtered.filter(product => {
-        return (
-          product.name.toLowerCase().includes(searchLower) ||
-          product.productCategory.toLowerCase().includes(searchLower) ||
-          product.material?.toLowerCase().includes(searchLower) ||
-          product.purity?.toLowerCase().includes(searchLower) ||
-          product.weight.toString().includes(searchLower)
-        );
+      console.log('Price components:', {
+        baseAmount,
+        wastageCharges,
+        makingCharges
       });
-    }
+      
+      if (isNaN(baseAmount) || isNaN(wastageCharges) || isNaN(makingCharges)) {
+        return 0;
+      }
 
-    // Apply category filter
-    if ((category && category !== "all") || (selectedCategory !== "all")) {
-      const filterCategory = category || selectedCategory;
-      filtered = filtered.filter(product => 
-        product.productCategory === filterCategory
+      const totalPrice = Math.round((baseAmount + wastageCharges + makingCharges) * 100) / 100;
+      console.log('Final price:', totalPrice);
+
+      if (totalPrice > 0) {
+        const cacheKey = `${product.productID}-${product.purity}-${product.weight}`;
+        globalCache.prices.set(cacheKey, totalPrice);
+        priceCache.current[cacheKey] = totalPrice;
+      }
+      
+      return totalPrice;
+    } catch (error) {
+      console.error('Error calculating price:', error);
+      return 0;
+    }
+  }, [priceData]);
+
+  const processProducts = useCallback((doc: any): Product[] => {
+    if (!doc.exists() || !doc.data().products) return [];
+    
+    const productsArray = doc.data().products || [];
+    return productsArray.map((data: any) => ({
+          name: data.name || '',
+          productCategory: data.category || data.productCategory || '',
+          material: data.material,
+          purity: data.purity,
+          weight: parseFloat(data.weight) || 0,
+          imageUrl: data.imageUrl || data.image || '',
+          imageUrls: data.imageUrls || [],
+          productID: data.productID || data.id,
+          timestamp: data.timestamp || data.createdAt || {
+            seconds: Date.now() / 1000,
+            nanoseconds: 0
+          },
+          viewCount: typeof data.viewCount === 'number' ? data.viewCount : 0,
+          lastViewed: data.lastViewed || null
+    }));
+  }, []);
+
+  const processCategories = useCallback((snapshot: any): Category[] => {
+    const categories: Category[] = [];
+    snapshot.forEach((doc: any) => {
+      categories.push({ id: doc.id, ...doc.data() } as Category);
+    });
+    return categories;
+  }, []);
+
+  const processPromotions = useCallback((snapshot: any): { [key: string]: Promotion } => {
+    const currentDate = new Date();
+    const promotions: { [key: string]: Promotion } = {};
+    
+    console.log('Processing promotions at:', currentDate.toISOString());
+    
+    snapshot.forEach((doc: any) => {
+      const promoData = doc.data() as Promotion;
+      
+      // Parse dates and normalize to UTC
+        const startDate = new Date(promoData.startDate);
+        const endDate = new Date(promoData.endDate);
+      const startUTC = new Date(Date.UTC(startDate.getFullYear(), startDate.getMonth(), startDate.getDate()));
+      const endUTC = new Date(Date.UTC(endDate.getFullYear(), endDate.getMonth(), endDate.getDate(), 23, 59, 59));
+      const currentUTC = new Date(Date.UTC(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate()));
+
+      console.log('Promotion date check:', {
+        promoName: promoData.promotionName,
+        startDate: startUTC.toISOString(),
+        endDate: endUTC.toISOString(),
+        currentDate: currentUTC.toISOString(),
+        isActive: currentUTC >= startUTC && currentUTC <= endUTC
+      });
+      
+      if (currentUTC >= startUTC && currentUTC <= endUTC) {
+        console.log('Adding active promotion:', promoData.promotionName);
+        promotions[promoData.productName] = {
+          ...promoData,
+          startDate: startUTC.toISOString(),
+          endDate: endUTC.toISOString()
+        };
+      }
+    });
+    
+    console.log('Active promotions:', Object.keys(promotions));
+    return promotions;
+  }, []);
+
+  const initializeData = useCallback(async () => {
+    const startTime = window.performance.now();
+    console.log('Starting data initialization at:', new Date().toISOString());
+    
+    try {
+      setIsLoading(true);
+
+      // Fetch fresh data in parallel
+      const fetchStartTime = window.performance.now();
+      const [productDoc, priceDoc, categoriesSnapshot, promotionsSnapshot] = await Promise.all([
+        getDoc(doc(db, "productData", "zzeEfRyePYTdWemfHHWH")),
+        getDoc(doc(db, "priceData", "4OhZCKHQls64bokVqGN5")),
+        getDocs(query(collection(db, 'categories'), orderBy('sortOrder'))),
+        getDocs(collection(db, "promotions"))
+      ]);
+      const fetchEndTime = window.performance.now();
+      console.log('Data fetch completed in:', fetchEndTime - fetchStartTime, 'ms');
+
+      const processStartTime = window.performance.now();
+      const processedProducts = processProducts(productDoc);
+      const processedPriceData = priceDoc.exists() ? priceDoc.data() : null;
+      const processedCategories = processCategories(categoriesSnapshot);
+      const processedPromotions = processPromotions(promotionsSnapshot);
+      const processEndTime = window.performance.now();
+      console.log('Data processing completed in:', processEndTime - processStartTime, 'ms');
+
+      // Update state
+      const updateStartTime = window.performance.now();
+      setProducts(processedProducts);
+      setPriceData(processedPriceData);
+      setCategories(processedCategories);
+      setPromotions(processedPromotions);
+      setHeaderFilteredProducts(processedProducts);
+      setFilteredProducts(processedProducts);
+      const updateEndTime = window.performance.now();
+      console.log('State update completed in:', updateEndTime - updateStartTime, 'ms');
+
+      const totalTime = window.performance.now() - startTime;
+      console.log('Total initialization time:', totalTime, 'ms');
+      
+      setPerformanceMetrics({
+        totalLoadTime: totalTime,
+        dataFetchTime: fetchEndTime - fetchStartTime,
+        renderTime: updateEndTime - updateStartTime,
+        initializationTime: processEndTime - processStartTime
+      });
+
+    } catch (error) {
+      console.error("Error initializing data:", error);
+      toast.error("Error loading data");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [processProducts, processCategories, processPromotions]);
+
+  // Add performance monitoring effect
+  useEffect(() => {
+    const renderStart = window.performance.now();
+    performanceRef.current.renderStart = renderStart;
+
+    return () => {
+      const renderTime = window.performance.now() - renderStart;
+      const totalTime = window.performance.now() - performanceRef.current.startTime;
+      
+      setPerformanceMetrics(prev => ({
+        ...prev,
+        renderTime,
+        totalLoadTime: totalTime,
+        initializationTime: prev.initializationTime
+      }));
+
+      console.log('Performance Metrics:', {
+        totalLoadTime: totalTime.toFixed(2) + 'ms',
+        dataFetchTime: performanceMetrics.dataFetchTime.toFixed(2) + 'ms',
+        renderTime: renderTime.toFixed(2) + 'ms',
+        initializationTime: performanceMetrics.initializationTime.toFixed(2) + 'ms'
+      });
+    };
+  }, []);
+
+  // Add performance display in the UI
+  const renderPerformanceMetrics = () => {
+    if (process.env.NODE_ENV === 'development') {
+      return (
+        <div className="fixed bottom-4 right-4 bg-white/80 text-white p-4 rounded-lg text-sm">
+          {/* <h3 className="font-bold mb-2">Performance Metrics</h3>
+          <div>Total Load: {performanceMetrics.totalLoadTime.toFixed(2)}ms</div>
+          <div>Data Fetch: {performanceMetrics.dataFetchTime.toFixed(2)}ms</div>
+          <div>Render: {performanceMetrics.renderTime.toFixed(2)}ms</div>
+          <div>Init: {performanceMetrics.initializationTime.toFixed(2)}ms</div> */}
+        </div>
       );
+    }
+    return null;
+  };
+
+  // Update the filtering effect
+  useEffect(() => {
+    const applyFilters = async () => {
+      setIsFiltering(true);
+      try {
+        console.log('Applying filters:', filters, 'Price data available:', !!priceData);
+        
+        // Start with base products
+        let filtered = [...(showWishlist ? wishlist : products)];
+        const params = new URLSearchParams(location.search);
+
+        // Apply search filter
+        const searchQuery = params.get("search");
+        const searchFields = params.get("searchFields")?.split(",") || [];
+        if (searchQuery && searchFields.length > 0) {
+          filtered = filtered.filter(product => 
+            matchesSearchUtil(product, searchQuery, searchFields)
+          );
+        }
+
+        // Apply category filters
+        if (filters.parentCategory) {
+          const parentCategory = categories.find(c => c.id === filters.parentCategory);
+          if (parentCategory) {
+            const childCategories = categories.filter(c => c.parentId === parentCategory.id);
+            const validCategories = [parentCategory.name, ...childCategories.map(c => c.name)];
+            filtered = filtered.filter(product => validCategories.includes(product.productCategory));
+          }
+        }
+
+        if (filters.subCategory) {
+          const subCategory = categories.find(c => c.id === filters.subCategory);
+          if (subCategory) {
+            filtered = filtered.filter(product => product.productCategory === subCategory.name);
+          }
     }
 
     // Apply material filter
-    if (selectedMaterial && selectedMaterial !== "all") {
+        if (filters.material) {
       filtered = filtered.filter(product => 
-        product.material === selectedMaterial
+            product.material?.toLowerCase() === filters.material?.toLowerCase()
       );
     }
 
     // Apply purity filter
-    if (selectedPurity && selectedPurity !== "all") {
+        if (filters.purity) {
       filtered = filtered.filter(product => 
-        product.purity === selectedPurity
+            product.purity === filters.purity
+          );
+        }
+
+        // Handle price sorting only if priceData is available
+        if (filters.sortBy === 'price_asc' || filters.sortBy === 'price_desc') {
+          if (priceData) {
+            console.log('Applying price sorting:', filters.sortBy);
+            const sortedProducts = sortProductsByPrice(filtered, filters.sortBy, calculatePrice);
+            setPriceSortedProducts(sortedProducts);
+            setFilteredProducts(sortedProducts);
+            } else {
+            console.log('Price sorting delayed - waiting for price data');
+            setFilteredProducts(filtered);
+            // Store the filter for reapplication when priceData becomes available
+            setPriceSortedProducts([]);
+            }
+        } else {
+          setPriceSortedProducts([]);
+          setFilteredProducts(filtered);
+    }
+
+      } catch (error) {
+        console.error('Error applying filters:', error);
+        toast.error('Error filtering products');
+      } finally {
+        setIsFiltering(false);
+      }
+    };
+
+    applyFilters();
+  }, [products, wishlist, showWishlist, filters, categories, location.search, calculatePrice, priceData]);
+
+  // Add effect to reapply price sorting when priceData becomes available
+  useEffect(() => {
+    if (priceData && (filters.sortBy === 'price_asc' || filters.sortBy === 'price_desc')) {
+      console.log('Price data became available, reapplying price sorting');
+      const filtered = [...(showWishlist ? wishlist : products)];
+      const sortedProducts = sortProductsByPrice(filtered, filters.sortBy, calculatePrice);
+      setPriceSortedProducts(sortedProducts);
+      setFilteredProducts(sortedProducts);
+    }
+  }, [priceData, filters.sortBy, products, wishlist, showWishlist, calculatePrice]);
+
+  // Update displayProducts logic
+  const displayProducts = useMemo(() => {
+    console.log('Updating displayProducts:', {
+      filterType: filters.sortBy,
+      priceSortedCount: priceSortedProducts.length,
+      filteredCount: filteredProducts.length,
+      priceDataAvailable: !!priceData
+    });
+
+    // If price sorting is active and we have priceData, use priceSortedProducts
+    if ((filters.sortBy === 'price_asc' || filters.sortBy === 'price_desc') && priceData) {
+      return priceSortedProducts;
+    }
+
+    // For header filtering
+    let productsToDisplay = headerFilteredProducts;
+
+    // Apply other filters
+    if (Object.keys(filters).length > 0) {
+      productsToDisplay = filteredProducts.filter(product => 
+        headerFilteredProducts.some(hp => hp.productID === product.productID)
       );
     }
 
-    // Apply price range filter
-    if (priceRange[0] !== 0 || priceRange[1] !== 1000000) {
-      filtered = filtered.filter(product => {
-        const price = priceRanges[product.name];
-        return price >= priceRange[0] && price <= priceRange[1];
-      });
-    }
+    return productsToDisplay;
+  }, [headerFilteredProducts, filteredProducts, filters.sortBy, priceSortedProducts, priceData]);
 
-    setFilteredProducts(filtered);
-  }, [searchParams, selectedCategory, selectedMaterial, selectedPurity, priceRange, products, priceRanges]);
+  // Update paginatedProducts to use displayProducts instead of filteredProducts
+  const paginatedProducts = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    return displayProducts.slice(startIndex, endIndex);
+  }, [displayProducts, currentPage, itemsPerPage]);
 
-  useEffect(() => {
-    if (searchResult.products.length > 0) {
-      // Only update if there's a significant change in the products
-      const currentIds = new Set(filteredProducts.map(p => p.productID));
-      const newIds = new Set(searchResult.products.map(p => p.productID));
+  // Memoized total pages
+  const totalPages = useMemo(() => {
+    return Math.ceil(displayProducts.length / itemsPerPage);
+  }, [displayProducts, itemsPerPage]);
+
+  const handleProductView = async (product: Product) => {
+    if (!product.productID) return;
+
+    try {
+      const docRef = doc(db, "productData", "zzeEfRyePYTdWemfHHWH");
+      const docSnap = await getDoc(docRef);
       
-      const hasChanges = searchResult.products.length !== filteredProducts.length ||
-        searchResult.products.some(p => !currentIds.has(p.productID)) ||
-        filteredProducts.some(p => !newIds.has(p.productID));
+      if (!docSnap.exists()) return;
 
-      if (hasChanges) {
-        setProducts(searchResult.products);
-        setFilteredProducts(searchResult.products);
-      }
+      // Update local state first for immediate feedback
+      setProducts(prevProducts => 
+        prevProducts.map(p => {
+          if (p.productID === product.productID) {
+            return {
+              ...p,
+              viewCount: (p.viewCount || 0) + 1,
+              lastViewed: new Date().toISOString()
+            };
+          }
+          return p;
+        })
+      );
+
+      // Update Firestore in the background
+      const data = docSnap.data();
+      const updatedProducts = data.products.map((p: any) => {
+        if (p.productID === product.productID) {
+          return {
+            ...p,
+            viewCount: (p.viewCount || 0) + 1,
+            lastViewed: new Date().toISOString()
+          };
+        }
+        return p;
+      });
+
+      await updateDoc(docRef, { products: updatedProducts });
+    } catch (error) {
+      console.error('Error updating product view:', error);
+      // Revert local state if Firestore update fails
+      setProducts(prevProducts => 
+        prevProducts.map(p => {
+          if (p.productID === product.productID) {
+            return {
+              ...p,
+              viewCount: (p.viewCount || 0) - 1
+            };
+          }
+          return p;
+        })
+      );
     }
-  }, [searchResult, filteredProducts]);
+  };
 
-  useEffect(() => {
-    let startTime = Date.now();
-    return () => {
-      if (currentProductId) {
-        const timeSpent = (Date.now() - startTime) / 1000;
-        trackProductView(currentProductId, timeSpent);
-      }
-    };
-  }, [currentProductId, trackProductView]);
+  const renderTrendingProducts = () => {
+    const productsWithViews = products.filter(p => (p.viewCount || 0) > 0);
+    console.log('Debug trending products:', {
+      totalProducts: products.length,
+      productsWithViews: productsWithViews.length,
+      viewCounts: products.map(p => ({
+        id: p.productID,
+        name: p.name,
+        viewCount: p.viewCount || 0
+      }))
+    });
 
-  useEffect(() => {
-    const fetchPopularityData = async () => {
-      try {
-        // Get view counts from userBehavior collection
-        const behaviorQuery = query(collection(db, 'userBehavior'), orderBy('viewCount', 'desc'));
-        const behaviorDocs = await getDocs(behaviorQuery);
+    // Only show trending section if we have products with views
+    const trendingProducts = products
+      .filter(product => (product.viewCount || 0) > 0)
+      .sort((a, b) => ((b.viewCount || 0) - (a.viewCount || 0)))
+      .slice(0, 5);
+
+    if (trendingProducts.length === 0) {
+      console.log('No trending products to display');
+      return null;
+    }
+
+    console.log('Displaying trending products:', 
+      trendingProducts.map(p => ({
+        id: p.productID,
+        name: p.name,
+        viewCount: p.viewCount
+      }))
+    );
+
+    return (
+      <div className="mt-12">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-2xl font-semibold text-gray-900">
+            Top Trending Products ({trendingProducts.length})
+          </h2>
+        </div>
         
-        const viewCounts = behaviorDocs.docs.reduce((acc, doc) => {
-          const data = doc.data();
-          acc[data.productId] = (acc[data.productId] || 0) + data.viewCount;
-          return acc;
-        }, {} as { [key: string]: number });
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6">
+          {trendingProducts.map((product) => (
+            <MemoizedProductCard
+              key={`trending-${product.productID}`}
+              product={product}
+              onAddToWishlist={handleAddToWishlist}
+              isInWishlist={wishlist.some(w => w.productID === product.productID)}
+              activePromotion={promotions[product.name]}
+              onView={() => {
+                if (product.productID) {
+                  setCurrentProductId(product.productID);
+                  handleProductView(product);
+                }
+              }}
+              isTrending
+            />
+          ))}
+        </div>
+      </div>
+    );
+  };
 
-        // Merge with trending products data
-        const popularityData = {
-          ...viewCounts,
-          ...recommendations.trendingProducts.reduce((acc, product) => {
-            acc[product.productId] = Math.max(
-              viewCounts[product.productId] || 0,
-              product.score || 0
-            );
-            return acc;
-          }, {} as { [key: string]: number })
-        };
+  // Add new useEffect for header category filtering
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const headerFilter = params.get("headerFilter");
+    const headerCategory = params.get("headerCategory");
+    const headerSubCategory = params.get("headerSubCategory");
+    const includeSubcategories = params.get("includeSubcategories");
 
-        setPopularityCache(popularityData);
-      } catch (error) {
-        console.error('Error fetching popularity data:', error);
-      }
-    };
-
-    fetchPopularityData();
-  }, [recommendations.trendingProducts]);
-
-  // Define handlers first before using them in hooks
-  const handleFilterChange = useCallback((newFilters: any) => {
-    // Create a copy of current filters
-    const currentFilters = { ...filters };
-    
-    // Handle each filter type separately
-    if ('category' in newFilters) {
-      currentFilters.category = newFilters.category[0] ? [newFilters.category[0]] : undefined;
-    }
-    if ('material' in newFilters) {
-      currentFilters.material = newFilters.material[0] ? [newFilters.material[0]] : undefined;
-    }
-    if ('purity' in newFilters) {
-      currentFilters.purity = newFilters.purity[0] ? [newFilters.purity[0]] : undefined;
-    }
-    if ('searchTerm' in newFilters) {
-      currentFilters.searchTerm = newFilters.searchTerm || undefined;
+    if (!headerFilter) {
+      setHeaderFilteredProducts(products);
+      return;
     }
 
-    // Optimistically update filtered products using the current products
-    const optimisticResult = products.filter(product => {
-      if (currentFilters.category?.length && !currentFilters.category.includes(product.productCategory)) {
-        return false;
-      }
-      if (currentFilters.material?.length && !currentFilters.material.includes(product.material)) {
-        return false;
-      }
-      if (currentFilters.purity?.length && !currentFilters.purity.includes(product.purity)) {
-        return false;
-      }
-      if (currentFilters.searchTerm) {
-        const searchLower = currentFilters.searchTerm.toLowerCase();
-        const searchableText = `${product.name} ${product.productCategory} ${product.material} ${product.purity}`.toLowerCase();
-        return searchableText.includes(searchLower);
+    // Filter products based on header category selection
+    const filtered = products.filter(product => {
+      if (headerSubCategory) {
+        // If subcategory is selected, filter by exact category match (existing behavior)
+        return product.productCategory.toLowerCase() === headerFilter.toLowerCase();
+      } else if (headerCategory && includeSubcategories === "true") {
+        // For parent category, include all subcategories
+        const clickedCategory = categories.find(cat => cat.id === headerCategory);
+        if (!clickedCategory) return false;
+
+        // Get all subcategories of the clicked category
+        const subcategories = categories.filter(cat => cat.parentId === headerCategory);
+        const validCategories = [clickedCategory.name, ...subcategories.map(cat => cat.name)];
+        
+        // Match if product category matches parent or any subcategory
+        return validCategories.some(catName => 
+          product.productCategory.toLowerCase() === catName.toLowerCase()
+        );
+      } else if (headerCategory) {
+        // If main category without includeSubcategories, match exact category
+        return product.productCategory.toLowerCase() === headerFilter.toLowerCase();
       }
       return true;
     });
-    
-    setFilteredProducts(optimisticResult);
 
-    // Then trigger the actual search
-    searchProducts(currentFilters, options, false);
-  }, [searchProducts, filters, options, products]);
-
-  const handleSortChange = useCallback((newSortBy: string) => {
-    // First, update the options to trigger the search
-    const newOptions = {
-      ...options,
-      sortBy: newSortBy as any
-    };
-
-    // Optimistically sort current products
-    const optimisticSort = [...filteredProducts].sort((a, b) => {
-      switch (newSortBy) {
-        case 'newest':
-          return (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0);
-        case 'price_asc':
-          return (priceRanges[a.name] || 0) - (priceRanges[b.name] || 0);
-        case 'price_desc':
-          return (priceRanges[b.name] || 0) - (priceRanges[a.name] || 0);
-        case 'popularity': {
-          // Use cached popularity data for stable sorting
-          const viewsA = popularityCache[a.productID || ''] || 0;
-          const viewsB = popularityCache[b.productID || ''] || 0;
-          if (viewsA === viewsB) {
-            // If popularity is the same, maintain stable order using timestamp
-            return (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0);
-          }
-          return viewsB - viewsA;
-        }
-        default:
-          return 0;
-      }
-    });
-
-    // Update filtered products immediately with optimistic sort
-    setFilteredProducts(optimisticSort);
-
-    // Then trigger the actual search with debounce to prevent flashing
-    const timeoutId = setTimeout(() => {
-      searchProducts(filters, newOptions);
-    }, 100);
-
-    return () => clearTimeout(timeoutId);
-  }, [searchProducts, filters, options, filteredProducts, priceRanges, popularityCache]);
-
-  // Debounced search with optimistic update
-  const debouncedSearch = useMemo(
-    () => debounce((searchTerm: string) => {
-      // Optimistically filter products
-      const optimisticResult = products.filter(product => {
-        const searchLower = searchTerm.toLowerCase();
-        const searchableText = `${product.name} ${product.productCategory} ${product.material} ${product.purity}`.toLowerCase();
-        return searchableText.includes(searchLower);
-      });
-      setFilteredProducts(optimisticResult);
-
-      // Then trigger the actual search
-      handleFilterChange({ searchTerm });
-    }, 300),
-    [handleFilterChange, products]
-  );
+    setHeaderFilteredProducts(filtered);
+  }, [location.search, products, categories]);
 
   const handleAddToWishlist = useCallback((product: Product) => {
     setWishlist(prev => {
-      const isInWishlist = prev.some(item => item.name === product.name);
-      let newWishlist: Product[];
-      
-      if (isInWishlist) {
-        newWishlist = prev.filter(item => item.name !== product.name);
-        toast.success("Removed from wishlist");
-      } else {
-        newWishlist = [...prev, product];
-        toast.success("Added to wishlist");
-      }
+      const isInWishlist = prev.some(item => item.productID === product.productID);
+      const newWishlist = isInWishlist
+        ? prev.filter(item => item.productID !== product.productID)
+        : [...prev, product];
       
       localStorage.setItem('wishlist', JSON.stringify(newWishlist));
       return newWishlist;
     });
   }, []);
 
+  // Update the useEffect to use the new initialization
+  useEffect(() => {
+    initializeData();
+  }, [initializeData]);
+
   if (isLoading) {
     return (
       <div className="container mx-auto px-4">
         <h1 className="text-4xl font-bold mb-8">Our Products</h1>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {[1, 2, 3].map((i) => (
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          {[1, 2, 3, 4, 5, 6, 8].map((i) => (
             <Skeleton key={i} className="h-[300px] w-full rounded-lg" />
           ))}
         </div>
@@ -514,182 +731,118 @@ const Products = () => {
     );
   }
 
-  const displayProducts = showWishlist ? wishlist : filteredProducts;
-
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="flex justify-between items-center mb-8">
-        <h1 className="text-2xl lg:text-4xl font-bold">
-          {showWishlist ? "My Wishlist" : "Our Products"}
-        </h1>
-        <button
-          onClick={() => setShowWishlist(!showWishlist)}
-          className="text-primary hover:text-primary/80 font-semibold"
-        >
-          {showWishlist ? "Show All Products" : "Show Wishlist"}
-        </button>
-      </div>
+    <div className="min-h-screen bg-background">
+      <div className="pt-28 sm:pt-24">
+        <div className="container mx-auto px-4 py-4">
+          <div className="flex justify-between items-center mb-8">
+            <h1 className="text-2xl lg:text-4xl font-bold">
+              {showWishlist ? "My Wishlist" : "Our Products"}
+            </h1>
+            <button
+              onClick={() => setShowWishlist(!showWishlist)}
+              className="text-primary hover:text-primary/80 font-semibold"
+            >
+              {showWishlist ? "Show All Products" : "Show Wishlist"}
+            </button>
+          </div>
 
-      <div className="mb-8">
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-          <Select
-            value={filters.category?.[0] || 'all'}
-            onValueChange={(value) => handleFilterChange({ category: value === 'all' ? [] : [value] })}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select Category" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Categories</SelectItem>
-              {Object.entries(searchResult.facets.categories).map(([category, count]) => (
-                <SelectItem key={category} value={category}>
-                  {category} ({count})
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Select
-            value={filters.material?.[0] || 'all'}
-            onValueChange={(value) => handleFilterChange({ material: value === 'all' ? [] : [value] })}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select Material" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Materials</SelectItem>
-              {Object.entries(searchResult.facets.materials).map(([material, count]) => (
-                <SelectItem key={material} value={material}>
-                  {material} ({count})
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Select
-            value={filters.purity?.[0] || 'all'}
-            onValueChange={(value) => handleFilterChange({ purity: value === 'all' ? [] : [value] })}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select Purity" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Purities</SelectItem>
-              {Object.entries(searchResult.facets.purities).map(([purity, count]) => (
-                <SelectItem key={purity} value={purity}>
-                  {purity} ({count})
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Select
-            value={options.sortBy || 'newest'}
-            onValueChange={handleSortChange}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Sort by" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="newest">Newest First</SelectItem>
-              <SelectItem value="price_asc">Price: Low to High</SelectItem>
-              <SelectItem value="price_desc">Price: High to Low</SelectItem>
-              <SelectItem value="popularity">Popularity</SelectItem>
-            </SelectContent>
-          </Select>
-
-          <input
-            type="text"
-            placeholder="Search products..."
-            className="w-full p-2 border rounded"
-            defaultValue={filters.searchTerm || ''}
-            onChange={(e) => debouncedSearch(e.target.value)}
+          <FilterBar
+            onFilterChange={setFilters}
+            materials={MATERIALS}
+            purities={PURITIES}
+            categories={categories}
           />
-        </div>
-      </div>
 
-      {isSearchLoading && (
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
-          {Array.from({ length: 8 }).map((_, index) => (
-            <div key={index} className="animate-pulse">
-              <div className="bg-gray-200 h-64 rounded-lg mb-2"></div>
-              <div className="bg-gray-200 h-4 rounded w-3/4 mb-2"></div>
-              <div className="bg-gray-200 h-4 rounded w-1/2"></div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {searchError && (
-        <div className="text-red-500 text-center py-8">
-          {searchError}
-        </div>
-      )}
-
-      {!isSearchLoading && !searchError && (
-        <>
           <div className="mb-4 text-gray-600">
-            Found {searchResult.totalCount} products
+            Found {displayProducts.length} products {totalPages > 1 ? `(Page ${currentPage} of ${totalPages})` : ''}
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
-            {searchResult.products.map((product) => (
-              <ProductCard
-                key={product.productID}
-                product={product}
-                onAddToWishlist={handleAddToWishlist}
-                isInWishlist={wishlist.some(w => w.productID === product.productID)}
-                activePromotion={promotions[product.name]}
-                onView={() => setCurrentProductId(product.productID || null)}
-              />
-            ))}
-          </div>
+          {isFiltering ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              {[1, 2, 3, 4].map((i) => (
+                <Skeleton key={i} className="h-[300px] w-full rounded-lg" />
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 min-h-[600px]">
+              {paginatedProducts.map((product) => (
+                <div
+                  key={`${product.productID}-${product.name}`}
+                  className="transform transition-transform duration-200 hover:scale-[1.02]"
+                >
+                  <MemoizedProductCard
+                    product={product}
+                    onAddToWishlist={handleAddToWishlist}
+                    isInWishlist={wishlist.some(w => w.productID === product.productID)}
+                    activePromotion={promotions[product.name]}
+                  onView={() => {
+                    if (product.productID) {
+                      setCurrentProductId(product.productID);
+                      handleProductView(product);
+                    }
+                  }}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
 
-          {!isRecommendationsLoading && recommendations.trendingProducts.length > 0 && (
-            <div className="mt-12">
-              <h2 className="text-2xl font-semibold mb-6">Trending Products</h2>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                {recommendations.trendingProducts.map((recommendation) => {
-                  const product = products.find(p => p.productID === recommendation.productId);
-                  if (!product) return null;
-                  return (
-                    <ProductCard
-                      key={product.productID}
-                      product={product}
-                      onAddToWishlist={handleAddToWishlist}
-                      isInWishlist={wishlist.some(w => w.productID === product.productID)}
-                      activePromotion={promotions[product.name]}
-                      onView={() => setCurrentProductId(product.productID || null)}
-                    />
-                  );
+          {renderTrendingProducts()}
+
+          {totalPages > 1 && (
+            <div className="mt-8 flex justify-center space-x-2">
+                  <button
+                className={`px-4 py-2 rounded-lg ${
+                  currentPage === 1
+                    ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                    : 'bg-primary text-white hover:bg-primary/90'
+                }`}
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage(prev => prev - 1)}
+                  >
+                    Previous
+                  </button>
+              
+              <div className="flex items-center space-x-2">
+                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  const pageNum = currentPage - 2 + i;
+                  if (pageNum > 0 && pageNum <= totalPages) {
+                    return (
+                      <button
+                        key={pageNum}
+                        className={`w-10 h-10 rounded-lg ${
+                          currentPage === pageNum
+                            ? 'bg-primary text-white'
+                            : 'bg-gray-200 hover:bg-gray-300'
+                        }`}
+                        onClick={() => setCurrentPage(pageNum)}
+                      >
+                        {pageNum}
+                      </button>
+                    );
+                  }
+                  return null;
                 })}
               </div>
-            </div>
+
+                  <button
+                className={`px-4 py-2 rounded-lg ${
+                  currentPage >= totalPages
+                    ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                    : 'bg-primary text-white hover:bg-primary/90'
+                }`}
+                disabled={currentPage >= totalPages}
+                onClick={() => setCurrentPage(prev => prev + 1)}
+                  >
+                    Next
+                  </button>
+                </div>
           )}
 
-          {searchResult.totalCount > options.limit && (
-            <div className="mt-8 flex justify-center">
-              <button
-                className="px-4 py-2 border rounded mr-2"
-                disabled={options.page === 1}
-                onClick={() => searchProducts(filters, { ...options, page: options.page - 1 })}
-              >
-                Previous
-              </button>
-              <span className="px-4 py-2">
-                Page {options.page} of {Math.ceil(searchResult.totalCount / options.limit)}
-              </span>
-              <button
-                className="px-4 py-2 border rounded ml-2"
-                disabled={options.page >= Math.ceil(searchResult.totalCount / options.limit)}
-                onClick={() => searchProducts(filters, { ...options, page: options.page + 1 })}
-              >
-                Next
-              </button>
-            </div>
-          )}
-        </>
-      )}
+          {renderPerformanceMetrics()}
+        </div>
+      </div>
     </div>
   );
 };

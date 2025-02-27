@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { cn } from "@/lib/utils";
+import { LazyImage } from "@/components/ui/LazyImage";
 
 interface ImageGalleryProps {
   mainImage: string;
@@ -8,10 +9,22 @@ interface ImageGalleryProps {
 
 const ImageGallery = ({ mainImage, images = [] }: ImageGalleryProps) => {
   // Filter out duplicates and empty strings, ensuring mainImage is included only once
-  const allImages = Array.from(new Set([mainImage, ...(images || [])])).filter(Boolean);
+  const allImages = useMemo(() => 
+    Array.from(new Set([mainImage, ...(images || [])])).filter(Boolean),
+    [mainImage, images]
+  );
+  
   const [selectedImage, setSelectedImage] = useState(allImages[0]);
   const [isZoomed, setIsZoomed] = useState(false);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
+
+  // Get the next images to preload based on the current selected image
+  const getPreloadUrls = (currentImage: string): string[] => {
+    const currentIndex = allImages.indexOf(currentImage);
+    const nextImages = allImages.slice(currentIndex + 1);
+    const previousImages = allImages.slice(0, currentIndex);
+    return [...nextImages, ...previousImages];
+  };
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!isZoomed) return;
@@ -34,7 +47,7 @@ const ImageGallery = ({ mainImage, images = [] }: ImageGalleryProps) => {
         onClick={() => setIsZoomed(!isZoomed)}
         onMouseMove={handleMouseMove}
       >
-        <img
+        <LazyImage
           src={selectedImage}
           alt="Product"
           className={cn(
@@ -48,6 +61,7 @@ const ImageGallery = ({ mainImage, images = [] }: ImageGalleryProps) => {
                 }
               : undefined
           }
+          preloadUrls={getPreloadUrls(selectedImage)}
         />
       </div>
       
@@ -62,10 +76,11 @@ const ImageGallery = ({ mainImage, images = [] }: ImageGalleryProps) => {
                 selectedImage === image && "ring-2 ring-primary"
               )}
             >
-              <img
+              <LazyImage
                 src={image}
                 alt={`Product view ${index + 1}`}
                 className="w-full h-full object-cover transition-all hover:scale-110"
+                preloadUrls={[selectedImage]}
               />
             </button>
           ))}

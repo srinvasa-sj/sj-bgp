@@ -1,5 +1,12 @@
+
 @layer components {
   .page-header-margin {
-    @apply mt-[220px] sm:mt-[140px] lg:mt-[100px];
+    @apply mt-[200px] sm:mt-[140px] lg:mt-[100px];
   }
 } 
+@media (max-width: 640px) { /* Adjust the max-width as needed */
+  .mobile-card {
+    max-width: 80%; /* Set the desired width */
+    margin: 0 auto; /* Center the card */
+  }
+}

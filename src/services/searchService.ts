@@ -1,127 +1,37 @@
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { SearchFilters, SearchOptions, SearchResult } from '@/types/search';
-import { query, collection, getDocs, orderBy } from 'firebase/firestore';
+import { query, collection, getDocs, orderBy, where } from 'firebase/firestore';
+import { Timestamp } from 'firebase/firestore';
 
-class SearchService {
-  private cachedProducts: any[] = [];
-  private cachedPriceData: any = null;
+// Define the Product interface
+interface Product {
+  id: string;
+  name: string;
+  description?: string;
+  productCategory?: string;
+  material?: string;
+  purity?: string;
+  weight: number;
+  imageUrl?: string;
+  imageUrls?: string[];
+  viewCount?: number;
+  createdAt: Timestamp;
+}
 
-  private async getAllProducts() {
-    try {
-      // Return cached products if available
-      if (this.cachedProducts.length > 0) {
-        return this.cachedProducts;
-      }
+// Price calculation function
+const calculatePrice = async (weight: number, purity: string | undefined, material: string | undefined): Promise<number> => {
+  try {
+    const priceDoc = await getDoc(doc(db, "priceData", "4OhZCKHQls64bokVqGN5"));
+    if (!priceDoc.exists()) return 0;
 
-      const docRef = doc(db, 'productData', 'zzeEfRyePYTdWemfHHWH');
-      const docSnap = await getDoc(docRef);
-      
-      if (docSnap.exists()) {
-        this.cachedProducts = docSnap.data().products || [];
-        return this.cachedProducts;
-      }
-      return [];
-    } catch (error) {
-      console.error('Error fetching products:', error);
-      return [];
-    }
-  }
-
-  private async getPriceData() {
-    try {
-      // Return cached price data if available
-      if (this.cachedPriceData) {
-        return this.cachedPriceData;
-      }
-
-      const priceDocRef = doc(db, "priceData", "4OhZCKHQls64bokVqGN5");
-      const priceDocSnap = await getDoc(priceDocRef);
-      
-      if (priceDocSnap.exists()) {
-        this.cachedPriceData = priceDocSnap.data();
-        return this.cachedPriceData;
-      }
-      return null;
-    } catch (error) {
-      console.error('Error fetching price data:', error);
-      return null;
-    }
-  }
-
-  private filterProducts(products: any[], filters: SearchFilters): any[] {
-    return products.filter(product => {
-      // Category filter
-      if (filters.category?.length && !filters.category.includes(product.productCategory)) {
-        return false;
-      }
-
-      // Material filter
-      if (filters.material?.length && !filters.material.includes(product.material)) {
-        return false;
-      }
-
-      // Purity filter
-      if (filters.purity?.length && !filters.purity.includes(product.purity)) {
-        return false;
-      }
-
-      // Weight range filter
-      if (filters.weight) {
-        const [min, max] = filters.weight;
-        if (product.weight < min || product.weight > max) {
-          return false;
-        }
-      }
-
-      // Search term filter
-      if (filters.searchTerm) {
-        const searchLower = filters.searchTerm.toLowerCase();
-        const searchableText = `${product.name} ${product.productCategory} ${product.material} ${product.purity}`.toLowerCase();
-        
-        // Split search term into words for better matching
-        const searchWords = searchLower.split(' ');
-        return searchWords.every(word => searchableText.includes(word));
-      }
-
-      return true;
-    });
-  }
-
-  private calculateFacets(products: any[]): SearchResult['facets'] {
-    const facets = {
-      categories: {},
-      materials: {},
-      purities: {}
-    };
-
-    products.forEach(product => {
-      // Categories
-      if (product.productCategory) {
-        facets.categories[product.productCategory] = (facets.categories[product.productCategory] || 0) + 1;
-      }
-
-      // Materials
-      if (product.material) {
-        facets.materials[product.material] = (facets.materials[product.material] || 0) + 1;
-      }
-
-      // Purities
-      if (product.purity) {
-        facets.purities[product.purity] = (facets.purities[product.purity] || 0) + 1;
-      }
-    });
-
-    return facets;
-  }
-
-  private async calculateProductPrice(product: any, priceData: any): Promise<number> {
+    const priceData = priceDoc.data();
     let basePrice = 0;
     let wastagePercentage = 0;
     let makingChargesPerGram = 0;
     let applyWastageMakingCharges = true;
 
-    switch (product.purity) {
+    switch (purity) {
       case "18 Karat":
         basePrice = priceData.price18Karat;
         wastagePercentage = priceData.goldwastageCharges;
@@ -155,120 +65,273 @@ class SearchService {
         return 0;
     }
 
-    const baseAmount = basePrice * product.weight;
+    const baseAmount = basePrice * weight;
     let totalPrice = baseAmount;
 
     if (applyWastageMakingCharges) {
       const wastageCharges = baseAmount * (wastagePercentage / 100);
-      const makingCharges = makingChargesPerGram * product.weight;
+      const makingCharges = makingChargesPerGram * weight;
       totalPrice = baseAmount + wastageCharges + makingCharges;
     }
 
     return totalPrice;
+  } catch (error) {
+    console.error('Error calculating price:', error);
+    return 0;
+  }
+};
+
+class SearchService {
+  private cachedProducts: Product[] | null = null;
+  private cachedPrices: Record<string, number> = {};
+
+  clearCache() {
+    this.cachedProducts = null;
+    this.cachedPrices = {};
   }
 
-  private async sortProducts(products: any[], sortBy?: SearchOptions['sortBy']): Promise<any[]> {
-    const sortedProducts = [...products];
+  private async getAllProducts(): Promise<Product[]> {
+    if (this.cachedProducts) {
+      return this.cachedProducts;
+    }
 
     try {
+      const productDocRef = doc(db, "productData", "zzeEfRyePYTdWemfHHWH");
+      const productDoc = await getDoc(productDocRef);
+      
+      if (!productDoc.exists()) {
+        console.log('Products document not found');
+        return [];
+      }
+
+      const data = productDoc.data();
+      const productsArray = data.products || [];
+      
+      console.log('Found products:', productsArray.length);
+      
+      const products = productsArray.map((data: any) => {
+        console.log('Product data:', data);
+        return {
+          id: data.productID || data.id,
+          name: data.name || '',
+          description: data.description || '',
+          productCategory: data.category || data.productCategory || '',
+          material: data.material || '',
+          purity: data.purity || '',
+          weight: data.weight || 0,
+          imageUrl: data.imageUrl || data.image || '',
+          imageUrls: data.imageUrls || [],
+          viewCount: data.viewCount || 0,
+          createdAt: data.createdAt || data.timestamp || Timestamp.now()
+        };
+      });
+
+      console.log('Processed products:', products.length);
+      this.cachedProducts = products;
+      return products;
+    } catch (error) {
+      console.error('Error fetching products:', error);
+      throw new Error('Failed to fetch products from database');
+    }
+  }
+
+  private async calculateProductPrice(product: Product): Promise<number> {
+    if (this.cachedPrices[product.id]) {
+      return this.cachedPrices[product.id];
+    }
+
+    try {
+      const price = await calculatePrice(
+        product.weight,
+        product.purity,
+        product.material
+      );
+      this.cachedPrices[product.id] = price;
+      return price;
+    } catch (error) {
+      console.error(`Error calculating price for product ${product.id}:`, error);
+      return 0;
+    }
+  }
+
+  private compareTimestamps(a: Timestamp | undefined, b: Timestamp | undefined): number {
+    if (!a && !b) return 0;
+    if (!a) return 1;
+    if (!b) return -1;
+    
+    const secondsDiff = b.seconds - a.seconds;
+    if (secondsDiff !== 0) return secondsDiff;
+    return b.nanoseconds - a.nanoseconds;
+  }
+
+  private async sortProducts(products: Product[], sortBy: string): Promise<Product[]> {
+    const sortedProducts = [...products];
+    
+    try {
       switch (sortBy) {
-        case 'price_asc':
-        case 'price_desc': {
-          const priceData = await this.getPriceData();
-          if (!priceData) return sortedProducts;
-
-          const productsWithPrices = await Promise.all(
-            sortedProducts.map(async (product) => ({
-              ...product,
-              calculatedPrice: await this.calculateProductPrice(product, priceData)
-            }))
-          );
-
-          return productsWithPrices.sort((a, b) => {
-            return sortBy === 'price_asc' 
-              ? a.calculatedPrice - b.calculatedPrice
-              : b.calculatedPrice - a.calculatedPrice;
-          });
-        }
         case 'newest':
           return sortedProducts.sort((a, b) => {
-            const dateA = a.timestamp?.seconds || 0;
-            const dateB = b.timestamp?.seconds || 0;
-            return dateB - dateA;
+            const timeA = a.createdAt.seconds || 0;
+            const timeB = b.createdAt.seconds || 0;
+            if (timeA === timeB) {
+              return (b.createdAt.nanoseconds || 0) - (a.createdAt.nanoseconds || 0);
+            }
+            return timeB - timeA;
           });
-        case 'popularity': {
-          const behaviorQuery = query(
-            collection(db, 'userBehavior'),
-            orderBy('viewCount', 'desc')
-          );
-          const behaviorDocs = await getDocs(behaviorQuery);
-          const viewCounts = new Map(
-            behaviorDocs.docs.map(doc => [
-              doc.data().productId,
-              doc.data().viewCount
-            ])
-          );
+          
+        case 'price_asc':
+        case 'price_desc': {
+          // Calculate prices for all products first
+          await Promise.all(sortedProducts.map(async (product) => {
+            if (!this.cachedPrices[product.id]) {
+              this.cachedPrices[product.id] = await this.calculateProductPrice(product);
+            }
+          }));
 
           return sortedProducts.sort((a, b) => {
-            const viewsA = viewCounts.get(a.productID) || 0;
-            const viewsB = viewCounts.get(b.productID) || 0;
-            return viewsB - viewsA;
+            const priceA = this.cachedPrices[a.id] || 0;
+            const priceB = this.cachedPrices[b.id] || 0;
+            if (priceA === priceB) {
+              return (b.createdAt.seconds || 0) - (a.createdAt.seconds || 0);
+            }
+            return sortBy === 'price_asc' ? priceA - priceB : priceB - priceA;
           });
         }
+          
+        case 'popularity':
+          return sortedProducts.sort((a, b) => {
+            const viewsA = a.viewCount || 0;
+            const viewsB = b.viewCount || 0;
+            if (viewsA === viewsB) {
+              return (b.createdAt.seconds || 0) - (a.createdAt.seconds || 0);
+            }
+            return viewsB - viewsA;
+          });
+          
         default:
           return sortedProducts;
       }
     } catch (error) {
       console.error('Error sorting products:', error);
-      return sortedProducts;
+      // On error, return products sorted by newest
+      return sortedProducts.sort((a, b) => {
+        const timeA = a.createdAt.seconds || 0;
+        const timeB = b.createdAt.seconds || 0;
+        return timeB - timeA;
+      });
     }
   }
 
-  public async searchProducts(
-    filters: SearchFilters,
-    options: SearchOptions
-  ): Promise<SearchResult> {
+  private filterProducts(products: Product[], filters: SearchFilters): Product[] {
+    const filteredProducts = [...products];
+    
+    return filteredProducts.filter(product => {
+      // Category filter
+      if (filters.category?.length) {
+        const productCategory = product.productCategory?.trim().toLowerCase();
+        const matchesCategory = filters.category.some(
+          category => category.toLowerCase() === productCategory
+        );
+        if (!matchesCategory) return false;
+      }
+
+      // Material filter
+      if (filters.material?.length) {
+        const productMaterial = product.material?.trim().toLowerCase();
+        const matchesMaterial = filters.material.some(
+          material => material.toLowerCase() === productMaterial
+        );
+        if (!matchesMaterial) return false;
+      }
+
+      // Purity filter
+      if (filters.purity?.length) {
+        const productPurity = product.purity?.trim().toLowerCase();
+        const matchesPurity = filters.purity.some(
+          purity => purity.toLowerCase() === productPurity
+        );
+        if (!matchesPurity) return false;
+      }
+
+      // Weight filter
+      if (filters.weight) {
+        const [min, max] = filters.weight;
+        const weight = parseFloat(product.weight.toString());
+        if (isNaN(weight) || weight < min || weight > max) {
+          return false;
+        }
+      }
+
+      // Search term filter
+      if (filters.searchTerm) {
+        const searchTerm = filters.searchTerm.toLowerCase();
+        const productName = product.name?.toLowerCase() || '';
+        const productDescription = product.description?.toLowerCase() || '';
+        
+        if (!productName.includes(searchTerm) && !productDescription.includes(searchTerm)) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }
+
+  public async search(filters: SearchFilters, options: SearchOptions): Promise<SearchResult> {
     try {
-      // Get all products
-      const allProducts = await this.getAllProducts();
-
+      console.log('Searching with filters:', filters);
+      console.log('Searching with options:', options);
+      
+      let products = await this.getAllProducts();
+      
       // Apply filters
-      const filteredProducts = this.filterProducts(allProducts, filters);
-
+      products = this.filterProducts(products, filters);
+      
+      // Apply sorting
+      products = await this.sortProducts(products, options.sortBy || 'newest');
+      
       // Calculate facets
-      const facets = this.calculateFacets(filteredProducts);
-
-      // Sort products
-      const sortedProducts = await this.sortProducts(filteredProducts, options.sortBy);
-
+      const facets = this.calculateFacets(products);
+      
       // Apply pagination
-      const start = (options.page - 1) * options.limit;
-      const end = start + options.limit;
-      const paginatedProducts = sortedProducts.slice(start, end);
-
+      const startIndex = (options.page - 1) * options.limit;
+      const endIndex = startIndex + options.limit;
+      const paginatedProducts = products.slice(startIndex, endIndex);
+      
       return {
         products: paginatedProducts,
-        totalCount: filteredProducts.length,
-        facets
+        facets,
+        totalCount: products.length
       };
     } catch (error) {
-      console.error('Error searching products:', error);
-      return {
-        products: [],
-        totalCount: 0,
-        facets: {
-          categories: {},
-          materials: {},
-          purities: {}
-        }
-      };
+      console.error('Search error:', error);
+      throw error;
     }
   }
 
-  // Add method to clear cache if needed
-  public clearCache() {
-    this.cachedProducts = [];
-    this.cachedPriceData = null;
+  private calculateFacets(products: Product[]): SearchResult['facets'] {
+    const facets: SearchResult['facets'] = {
+      categories: {},
+      materials: {},
+      purities: {}
+    };
+
+    products.forEach(product => {
+      if (product.productCategory) {
+        const category = product.productCategory.trim();
+        facets.categories[category] = (facets.categories[category] || 0) + 1;
+      }
+      if (product.material) {
+        const material = product.material.trim();
+        facets.materials[material] = (facets.materials[material] || 0) + 1;
+      }
+      if (product.purity) {
+        const purity = product.purity.trim();
+        facets.purities[purity] = (facets.purities[purity] || 0) + 1;
+      }
+    });
+
+    return facets;
   }
 }
 

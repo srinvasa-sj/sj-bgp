@@ -913,14 +913,6 @@ const CategoryManagement = () => {
                 Manage your product categories, subcategories, and attributes
               </p>
             </div>
-            <Button
-              variant="outline"
-              onClick={() => navigate("/admin")}
-              className="flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-white border-none"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Back to Admin
-            </Button>
           </div>
           <div className="flex items-center justify-end gap-2">
             <Button

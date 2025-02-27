@@ -8,34 +8,45 @@ const firebaseConfig = {
   apiKey: "AIzaSyBHvfSUV6bCzMhHZJTVhVIPgQvRGcvNR8s",
   authDomain: "srinivasajewellers-bgp.firebaseapp.com",
   projectId: "srinivasajewellers-bgp",
-  storageBucket: "srinivasajewellers-bgp.firebasestorage.app",
+  storageBucket: "srinivasajewellers-bgp.appspot.com",
   messagingSenderId: "902589055367",
   appId: "1:902589055367:web:4678306e399f4289269322",
   measurementId: "G-D087V83R2V"
 };
 
-const app = initializeApp(firebaseConfig);
+let app;
+let db;
+let auth;
+let storage;
 
-// Initialize auth with persistence
-export const auth = getAuth(app);
-setPersistence(auth, browserLocalPersistence)
-  .catch((error) => {
-    console.warn("Auth persistence error:", error);
+try {
+  console.log('Initializing Firebase...');
+  app = initializeApp(firebaseConfig);
+  
+  // Initialize Firestore with persistence
+  db = initializeFirestore(app, {
+    localCache: persistentLocalCache({
+      tabManager: persistentMultipleTabManager()
+    })
   });
 
-// Initialize Firestore with persistent cache and multi-tab support
-export const db = initializeFirestore(app, {
-  cache: persistentLocalCache({
-    tabManager: persistentMultipleTabManager()
-  })
-});
+  // Initialize auth with persistence
+  auth = getAuth(app);
+  setPersistence(auth, browserLocalPersistence).catch((error) => {
+    console.error("Auth persistence error:", error);
+    toast.error("Error setting up authentication persistence");
+  });
 
-// Initialize storage
-export const storage = getStorage(app);
+  // Initialize storage
+  storage = getStorage(app);
 
-console.log('Connected to Firebase services');
+  console.log('Firebase services initialized successfully');
+} catch (error) {
+  console.error('Error initializing Firebase:', error);
+  toast.error('Failed to initialize Firebase services');
+}
 
-export default app;
+export { app, auth, db, storage };
 
 
 

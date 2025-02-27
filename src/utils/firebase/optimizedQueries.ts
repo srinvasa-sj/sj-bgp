@@ -6,24 +6,10 @@ import {
   collection,
   DocumentReference, 
   DocumentData,
-  QueryConstraint,
-  enableIndexedDbPersistence
+  QueryConstraint
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { toast } from 'sonner';
-
-// Initialize Firestore with persistence
-try {
-  enableIndexedDbPersistence(db).catch((err) => {
-    if (err.code === 'failed-precondition') {
-      toast.error('Multiple tabs open, persistence can only be enabled in one tab at a time.');
-    } else if (err.code === 'unimplemented') {
-      toast.error('The current browser does not support persistence.');
-    }
-  });
-} catch (error) {
-  console.error('Error enabling persistence:', error);
-}
 
 // Cache configuration
 const CACHE_TIME = 5 * 60 * 1000; // 5 minutes

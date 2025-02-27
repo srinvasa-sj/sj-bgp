@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { doc, getDoc, collection, getDocs, query, where } from "firebase/firestore";
@@ -29,6 +28,8 @@ const ProductDetails = () => {
     const fetchProductDetails = async () => {
       try {
         console.log("Fetching product details for:", productName);
+        setIsLoading(true);
+        
         const docRef = doc(db, "productData", "zzeEfRyePYTdWemfHHWH");
         const docSnap = await getDoc(docRef);
 
@@ -37,14 +38,25 @@ const ProductDetails = () => {
           const productData = productsData.find((p: Product) => p.name === productName);
 
           if (productData) {
+            console.log("Found product data:", productData);
             const allImages = Array.from(new Set([productData.imageUrl, ...(productData.imageUrls || [])])).filter(Boolean);
-            setProduct({
+            const product = {
               ...productData,
               imageUrls: allImages,
-            });
-
-            await fetchPromotionDetails(productData);
-            await calculatePrices(productData);
+            };
+            
+            // Reset states before fetching new data
+            setProduct(product);
+            setActivePromotion(null);
+            setPromotionPrice(null);
+            setPriceBreakdown(null);
+            setOriginalPrice(null);
+            
+            // First fetch promotion details and wait for it
+            const promotion = await fetchPromotionDetails(product);
+            
+            // Then calculate prices with the promotion
+            await calculatePrices(product, promotion);
           } else {
             toast.error("Product not found");
           }
@@ -57,38 +69,117 @@ const ProductDetails = () => {
       }
     };
 
-    fetchProductDetails();
+    if (productName) {
+      fetchProductDetails();
+    }
   }, [productName]);
 
   const fetchPromotionDetails = async (product: Product) => {
     try {
+      console.log("Fetching promotions for product:", product.name);
       const promotionsRef = collection(db, "promotions");
-      const q = query(promotionsRef, where("productName", "==", product.name), where("active", "==", true));
+      const q = query(promotionsRef, where("productName", "==", product.name));
 
       const querySnapshot = await getDocs(q);
       const currentDate = new Date();
+      let foundPromotion = null;
 
-      querySnapshot.forEach((doc) => {
+      for (const doc of querySnapshot.docs) {
         const promoData = doc.data();
+        
+        // Parse dates and normalize to UTC midnight
         const startDate = new Date(promoData.startDate);
         const endDate = new Date(promoData.endDate);
+        
+        // Set current date to UTC midnight for consistent comparison
+        const currentUTC = new Date(Date.UTC(
+          currentDate.getUTCFullYear(),
+          currentDate.getUTCMonth(),
+          currentDate.getUTCDate()
+        ));
 
-        if (currentDate >= startDate && currentDate <= endDate) {
-          console.log("Found active promotion:", promoData);
-          setActivePromotion({ ...promoData, id: doc.id });
+        // Set start date to UTC midnight
+        const startUTC = new Date(Date.UTC(
+          startDate.getUTCFullYear(),
+          startDate.getUTCMonth(),
+          startDate.getUTCDate()
+        ));
+
+        // Set end date to UTC 23:59:59.999
+        const endUTC = new Date(Date.UTC(
+          endDate.getUTCFullYear(),
+          endDate.getUTCMonth(),
+          endDate.getUTCDate(),
+          23, 59, 59, 999
+        ));
+
+        // Ensure all discount values are numbers
+        const priceDiscount = Number(promoData.priceDiscount) || 0;
+        const wastageDiscount = Number(promoData.wastageDiscount) || 0;
+        const makingChargesDiscount = Number(promoData.makingChargesDiscount) || 0;
+
+        // Check if the promotion is active based on dates
+        const isWithinDateRange = currentUTC >= startUTC && currentUTC <= endUTC;
+
+        console.log("Checking promotion:", {
+          name: promoData.promotionName,
+          startDate: startUTC.toISOString(),
+          endDate: endUTC.toISOString(),
+          currentDate: currentUTC.toISOString(),
+          isWithinDateRange,
+          discounts: { priceDiscount, wastageDiscount, makingChargesDiscount }
+        });
+
+        // Only consider promotion if it has at least one non-zero discount
+        const hasValidDiscounts = priceDiscount > 0 || wastageDiscount > 0 || makingChargesDiscount > 0;
+
+        if (isWithinDateRange && hasValidDiscounts) {
+          console.log("Found valid promotion with discounts:", {
+            name: promoData.promotionName,
+            priceDiscount,
+            wastageDiscount,
+            makingChargesDiscount,
+            startDate: startUTC.toISOString(),
+            endDate: endUTC.toISOString()
+          });
+          
+          foundPromotion = {
+            ...promoData,
+            id: doc.id,
+            startDate: startUTC.toISOString(),
+            endDate: endUTC.toISOString(),
+            priceDiscount,
+            wastageDiscount,
+            makingChargesDiscount
+          };
+          break;
         }
-      });
+      }
+
+      console.log("Setting active promotion:", foundPromotion);
+      setActivePromotion(foundPromotion);
+      return foundPromotion;
     } catch (error) {
       console.error("Error fetching promotion:", error);
+      return null;
     }
   };
 
-  const calculatePrices = async (product: Product) => {
+  const calculatePrices = async (product: Product, promotion: any) => {
     try {
+      console.log("Calculating prices for product:", {
+        name: product.name,
+        purity: product.purity,
+        weight: product.weight,
+        hasPromotion: !!promotion,
+        promotionDetails: promotion
+      });
+
       const priceDocRef = doc(db, "priceData", "4OhZCKHQls64bokVqGN5");
       const priceDocSnap = await getDoc(priceDocRef);
 
       if (!priceDocSnap.exists()) {
+        console.error("Price data not available");
         toast.error("Error: Price data not available");
         return;
       }
@@ -102,50 +193,75 @@ const ProductDetails = () => {
       // Get the correct price and charges based on purity
       switch (product.purity) {
         case "18 Karat":
-          basePrice = priceData.price18Karat;
-          wastagePercentage = priceData.goldwastageCharges;
-          makingChargesPerGram = priceData.goldmakingCharges;
+          basePrice = Number(priceData.price18Karat);
+          wastagePercentage = Number(priceData.goldwastageCharges);
+          makingChargesPerGram = Number(priceData.goldmakingCharges);
           break;
         case "20 Karat":
-          basePrice = priceData.price20Karat;
-          wastagePercentage = priceData.goldwastageCharges;
-          makingChargesPerGram = priceData.goldmakingCharges;
+          basePrice = Number(priceData.price20Karat);
+          wastagePercentage = Number(priceData.goldwastageCharges);
+          makingChargesPerGram = Number(priceData.goldmakingCharges);
           break;
         case "22 Karat":
-          basePrice = priceData.price22Karat;
-          wastagePercentage = priceData.goldwastageCharges;
-          makingChargesPerGram = priceData.goldmakingCharges;
+          basePrice = Number(priceData.price22Karat);
+          wastagePercentage = Number(priceData.goldwastageCharges);
+          makingChargesPerGram = Number(priceData.goldmakingCharges);
           break;
         case "24 Karat":
-          basePrice = priceData.price24Karat;
+          basePrice = Number(priceData.price24Karat);
           applyWastageMakingCharges = false;
           break;
         case "Silver 999":
-          basePrice = priceData.priceSilver1;
-          wastagePercentage = priceData.wastageChargesSilver;
-          makingChargesPerGram = priceData.makingChargesSilver;
+          basePrice = Number(priceData.priceSilver1);
+          wastagePercentage = Number(priceData.wastageChargesSilver);
+          makingChargesPerGram = Number(priceData.makingChargesSilver);
           break;
         case "Silver 925":
-          basePrice = priceData.priceSilver2;
-          wastagePercentage = priceData.wastageChargesSilver;
-          makingChargesPerGram = priceData.makingChargesSilver;
+          basePrice = Number(priceData.priceSilver2);
+          wastagePercentage = Number(priceData.wastageChargesSilver);
+          makingChargesPerGram = Number(priceData.makingChargesSilver);
           break;
         default:
+          console.error("Invalid product purity:", product.purity);
           toast.error("Error: Invalid product purity");
           return;
       }
 
-      const baseAmount = basePrice * product.weight;
-      let totalPrice = baseAmount;
+      // Ensure all values are numbers
+      const weight = Number(product.weight);
+      basePrice = Number(basePrice);
+      wastagePercentage = Number(wastagePercentage);
+      makingChargesPerGram = Number(makingChargesPerGram);
+
+      console.log("Base calculation values:", {
+        basePrice,
+        weight,
+        wastagePercentage,
+        makingChargesPerGram,
+        applyWastageMakingCharges
+      });
+
+      // Calculate original price components
+      const baseAmount = basePrice * weight;
       let wastageCharges = 0;
       let makingCharges = 0;
 
       if (applyWastageMakingCharges) {
         wastageCharges = baseAmount * (wastagePercentage / 100);
-        makingCharges = makingChargesPerGram * product.weight;
-        totalPrice = baseAmount + wastageCharges + makingCharges;
+        makingCharges = makingChargesPerGram * weight;
       }
 
+      const totalPrice = baseAmount + wastageCharges + makingCharges;
+
+      console.log("Original price components:", {
+        baseAmount,
+        wastageCharges,
+        makingCharges,
+        totalPrice
+      });
+
+      // Set original price and breakdown
+      setOriginalPrice(totalPrice);
       setPriceBreakdown({
         baseAmount,
         wastageCharges,
@@ -154,20 +270,41 @@ const ProductDetails = () => {
         makingChargesPerGram,
       });
 
-      setOriginalPrice(totalPrice);
+      // Calculate promotional price if there's an active promotion
+      if (promotion) {
+        // Ensure discount values are numbers and convert to decimals
+        const priceDiscount = Number(promotion.priceDiscount) || 0;
+        const wastageDiscount = Number(promotion.wastageDiscount) || 0;
+        const makingChargesDiscount = Number(promotion.makingChargesDiscount) || 0;
 
-      // Calculate promotion price if active promotion exists
-      if (activePromotion) {
-        const discountedBasePrice = basePrice * (1 - activePromotion.priceDiscount / 100);
-        const discountedWastage = applyWastageMakingCharges
-          ? baseAmount * ((wastagePercentage * (1 - activePromotion.wastageDiscount / 100)) / 100)
-          : 0;
-        const discountedMaking = applyWastageMakingCharges
-          ? makingChargesPerGram * (1 - activePromotion.makingChargesDiscount / 100) * product.weight
-          : 0;
+        console.log("Applying promotional discounts:", {
+          priceDiscount,
+          wastageDiscount,
+          makingChargesDiscount
+        });
 
-        const promotionalPrice = discountedBasePrice * product.weight + discountedWastage + discountedMaking;
+        // Calculate discounted components
+        const discountedBaseAmount = baseAmount * (1 - (priceDiscount / 100));
+        const discountedWastageCharges = applyWastageMakingCharges ? 
+          wastageCharges * (1 - (wastageDiscount / 100)) : 0;
+        const discountedMakingCharges = applyWastageMakingCharges ? 
+          makingCharges * (1 - (makingChargesDiscount / 100)) : 0;
+
+        // Calculate total promotional price by summing discounted components
+        const promotionalPrice = discountedBaseAmount + discountedWastageCharges + discountedMakingCharges;
+
+        console.log("Promotional price calculation:", {
+          discountedBaseAmount,
+          discountedWastageCharges,
+          discountedMakingCharges,
+          promotionalPrice,
+          totalDiscount: ((totalPrice - promotionalPrice) / totalPrice * 100).toFixed(2) + '%'
+        });
+
         setPromotionPrice(promotionalPrice);
+      } else {
+        console.log("No active promotion, skipping promotional price calculation");
+        setPromotionPrice(null);
       }
     } catch (error) {
       console.error("Error calculating prices:", error);

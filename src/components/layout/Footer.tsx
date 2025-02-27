@@ -14,7 +14,8 @@ const Footer = () => {
               About Us
             </h3>
             <p className="text-sm text-gray-400">
-              Srinivas Jewellers has been crafting beautiful jewelry since 1990. 
+              Srinivas Jewellers has been crafting beautiful 
+              BIS Hallmark Jewellery since 1990. 
               We take pride in our quality, innovation, and customer service. 
               Our designs are timeless and loved by generations.
             </p>

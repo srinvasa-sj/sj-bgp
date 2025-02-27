@@ -287,7 +287,7 @@ const Home = () => {
 
   return (
     <div className="min-h-screen bg-background mt-16 sm:mt-0">
-      <div className="container mx-auto px-2 sm:px-4 py-4 sm:py-8 max-w-7xl">
+      <div className="container mx-auto px-2 sm:px-4 py-4 sm:py-8 max-w-7xl mobile-container">
         <section className="page-header-margin">
           <h1 className="text-2xl text-left sm:text-left sm:text-4xl md:text-5xl lg:text-6xl font-bold text-black mb-3 sm:mb-4 leading-tight">
             Welcome to Srinivasa Jewellers
@@ -314,7 +314,7 @@ const Home = () => {
                 Last Updated: {new Date().toLocaleTimeString()}
               </div>
             </div>
-            <div className="grid grid-cols-1 lg:grid-cols-6 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
               {[
                 ...PURITY_OPTIONS['Gold'].map(purity => ({
                   label: purity,
@@ -337,12 +337,7 @@ const Home = () => {
                   }[purity]
                 }))
               ].map((item, index) => (
-                <div
-                  key={index}
-                  className={`bg-white/50 backdrop-blur-sm p-4 rounded-lg shadow-sm hover:shadow-md transition-all duration-300 border ${
-                    item.color === 'amber' ? 'border-amber-100 hover:border-amber-300' : 'border-gray-100 hover:border-gray-300'
-                  }`}
-                >
+                <div key={index} className={`mobile-card bg-white p-4 rounded-lg shadow-md`}>
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger className="w-full text-left">

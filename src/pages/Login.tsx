@@ -110,6 +110,7 @@ const Login = () => {
     try {
       setIsSubmitting(true);
       if (isSignUp) {
+        /*
         const userCredential = await createUserWithEmailAndPassword(
           auth,
           validation.sanitizedData.email,
@@ -130,6 +131,7 @@ const Login = () => {
         await setDoc(doc(db, "users", userCredential.user.uid), userData);
         toast.success("Account created successfully!");
         navigate("/customer-dashboard");
+        */
       } else {
         const userCredential = await signInWithEmailAndPassword(
           auth, 
@@ -339,9 +341,9 @@ const Login = () => {
             </form>
 
             <div className="mt-4 text-center space-y-2">
-              <p className="text-sm text-gray-600">
+              {/* <p className="text-sm text-gray-600">
                 {isSignUp ? "Already have an account?" : "Don't have an account?"}
-              </p>
+              </p> */}
               <Button
                 variant="link"
                 onClick={() => {
@@ -351,7 +353,7 @@ const Login = () => {
                 className="text-primary"
                 disabled={isSubmitting}
               >
-                {isSignUp ? "Login" : "Sign Up"}
+                {/* {isSignUp ? "Login" : "Sign Up"} */}
               </Button>
               {!isSignUp && (
                 <Button

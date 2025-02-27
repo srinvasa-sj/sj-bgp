@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback, memo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useVirtualizer } from '@tanstack/react-virtual';
@@ -20,6 +20,7 @@ import { Loader2, Plus, Trash2, GripVertical } from 'lucide-react';
 import { Badge } from "@/components/ui/badge";
 import { defaultCategory } from "@/constants/categoryDefaults";
 import { toast } from "@/components/ui/use-toast";
+import { slugify } from "@/lib/utils";
 
 const attributeTypes = [
   { value: "text", label: "Text" },
@@ -69,25 +70,34 @@ const materialPurities = {
   silver: ["Silver 999", "Silver 925"]
 };
 
-const CategoryForm = ({ 
+const CategoryForm = memo(({ 
   category, 
   categories, 
   onSave, 
   onCancel, 
   isSubmitting,
+  showInHeader,
   suggestedCategories,
   onSuggestedCategoryClick 
 }: CategoryFormProps) => {
-  const [formData, setFormData] = useState<NewCategory>({
+  const [formData, setFormData] = useState<CategoryFormData>(() => ({
     ...category,
+    showInHeader: showInHeader,
     materialOptions: category.materialOptions.length > 0 
       ? [category.materialOptions[0]] 
       : [defaultMaterialOption]
-  });
+  }));
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [newAttributeOption, setNewAttributeOption] = useState("");
   const [newPurity, setNewPurity] = useState("");
   const [newFinish, setNewFinish] = useState("");
+
+  const debouncedValidation = useCallback(
+    debounce((value: string) => {
+      // Validation logic here if needed
+    }, 300),
+    []
+  );
 
   useEffect(() => {
     setFormData(category);
@@ -145,10 +155,11 @@ const CategoryForm = ({
     }
   };
 
-  const handleChange = (field: keyof NewCategory, value: any) => {
+  const handleChange = useCallback((field: keyof CategoryFormData, value: any) => {
     setFormData(prev => ({
       ...prev,
-      [field]: value
+      [field]: value,
+      ...(field === 'name' ? { slug: slugify(value) } : {})
     }));
 
     // Clear error when field is changed
@@ -159,7 +170,17 @@ const CategoryForm = ({
         return newErrors;
       });
     }
-  };
+  }, []);
+
+  const handleNameChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setFormData(prev => ({
+      ...prev,
+      name: value,
+      slug: slugify(value)
+    }));
+    debouncedValidation(value);
+  }, [debouncedValidation]);
 
   const handleAttributeChange = (index: number, field: keyof CategoryAttribute, value: any) => {
     setFormData(prev => ({
@@ -406,8 +427,10 @@ const CategoryForm = ({
             <Input
               id="name"
               value={formData.name}
-              onChange={(e) => handleChange('name', e.target.value)}
+              onChange={handleNameChange}
               className={errors.name ? 'border-red-500' : ''}
+              placeholder="Enter category name"
+              required
             />
             {errors.name && <p className="mt-1 text-sm text-red-500">{errors.name}</p>}
           </div>
@@ -767,6 +790,8 @@ const CategoryForm = ({
       </form>
     </div>
   );
-};
+});
+
+CategoryForm.displayName = 'CategoryForm';
 
 export default CategoryForm; 

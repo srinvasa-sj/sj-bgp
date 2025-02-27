@@ -1,6 +1,6 @@
-
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
+import { useState, useCallback } from "react";
 
 interface ProductPriceProps {
   showPrice: boolean;
@@ -9,6 +9,7 @@ interface ProductPriceProps {
   promotionPrice: number | null;
   activePromotion: any;
   onCheckPrice: () => void;
+  onView: () => void;
   productName: string;
   productID?: string;
 }
@@ -20,14 +21,31 @@ const ProductPrice = ({
   promotionPrice,
   activePromotion,
   onCheckPrice,
+  onView,
   productName,
   productID
 }: ProductPriceProps) => {
   const navigate = useNavigate();
+  const [isNavigating, setIsNavigating] = useState(false);
 
-  const handleViewProduct = () => {
-    navigate(`/product/${encodeURIComponent(productName)}`);
-  };
+  const handleViewProduct = useCallback(async () => {
+    if (isNavigating) return;
+    setIsNavigating(true);
+
+    try {
+      // Track the view first
+      await onView();
+      
+      // Navigate after a short delay
+      setTimeout(() => {
+        navigate(`/product/${encodeURIComponent(productName)}`);
+      }, 100);
+    } catch (error) {
+      console.error('Error handling product view:', error);
+    } finally {
+      setIsNavigating(false);
+    }
+  }, [navigate, onView, productName, isNavigating]);
 
   if (!showPrice) {
     return (
@@ -43,6 +61,7 @@ const ProductPrice = ({
           onClick={handleViewProduct}
           className="flex-1 text-white bg-primary hover:bg-transparent/20"
           variant="outline"
+          disabled={isNavigating}
         >
           View Details
         </Button>
@@ -81,6 +100,7 @@ const ProductPrice = ({
         onClick={handleViewProduct}
         className="w-full"
         variant="outline"
+        disabled={isNavigating}
       >
         View Details
       </Button>

@@ -48,12 +48,10 @@ const PromotionForm = ({ products }: { products: Product[] }) => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      // Convert discount values to numbers, defaulting to 0 if empty
       const priceDiscount = formData.priceDiscount ? parseFloat(formData.priceDiscount) : 0;
       const wastageDiscount = formData.wastageDiscount ? parseFloat(formData.wastageDiscount) : 0;
       const makingChargesDiscount = formData.makingChargesDiscount ? parseFloat(formData.makingChargesDiscount) : 0;
 
-      // Validate discount ranges only if values are provided
       if (formData.priceDiscount && (isNaN(priceDiscount) || priceDiscount < 0 || priceDiscount > 99.99)) {
         toast.error("Price discount must be between 0 and 99.99");
         return;
@@ -149,18 +147,17 @@ const PromotionForm = ({ products }: { products: Product[] }) => {
       
       toast.success(`Successfully deleted ${promotionsToDelete.length} promotion(s)`);
       
-      // Reset form if it was a single delete
       if (deleteMode === 'single') {
-      setFormData({
-        promotionName: "",
-        priceDiscount: "",
-        wastageDiscount: "",
-        makingChargesDiscount: "",
-        giftDescription: "",
-        selectedProducts: [],
-        startDate: "",
-        endDate: "",
-      });
+        setFormData({
+          promotionName: "",
+          priceDiscount: "",
+          wastageDiscount: "",
+          makingChargesDiscount: "",
+          giftDescription: "",
+          selectedProducts: [],
+          startDate: "",
+          endDate: "",
+        });
       }
     } catch (error) {
       console.error("Error deleting promotions:", error);
@@ -174,20 +171,18 @@ const PromotionForm = ({ products }: { products: Product[] }) => {
 
   const handleProductSelect = (productName: string) => {
     if (productName.includes(",")) {
-      // Handle bulk selection/deselection
       const productNames = productName.split(",");
       setFormData(prev => ({
         ...prev,
         selectedProducts: productNames
       }));
     } else {
-      // Handle individual product selection
-    setFormData(prev => ({
-      ...prev,
-      selectedProducts: prev.selectedProducts.includes(productName)
-        ? prev.selectedProducts.filter(name => name !== productName)
-        : [...prev.selectedProducts, productName]
-    }));
+      setFormData(prev => ({
+        ...prev,
+        selectedProducts: prev.selectedProducts.includes(productName)
+          ? prev.selectedProducts.filter(name => name !== productName)
+          : [...prev.selectedProducts, productName]
+      }));
     }
   };
 
@@ -238,7 +233,6 @@ const PromotionForm = ({ products }: { products: Product[] }) => {
         </div>
       </form>
 
-      {/* Only show DeletePromotions when form is empty */}
       {!formData.promotionName && !formData.priceDiscount && !formData.wastageDiscount && 
        !formData.makingChargesDiscount && !formData.giftDescription && formData.selectedProducts.length === 0 && (
         <div className="mt-8 pt-8 border-t">

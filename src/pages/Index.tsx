@@ -89,7 +89,7 @@ const Index = () => {
         `}
       >
         <Header toggleSidebar={toggleSidebar} />
-        <main className="flex-grow container mx-auto px-4 sm:px-6 md:px-4 pt-24 pb-8 w-full lg:max-w-screen-3xl lg:ml-10">
+        <main className="flex-grow container mx-auto px-4 sm:px-6 md:px-4 pt-16 pb-8 w-full lg:max-w-screen-3xl lg:ml-10">
           <Outlet />
         </main>
         <Footer />
