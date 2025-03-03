@@ -57,7 +57,7 @@ class ContactService {
     endDate?: Date;
   }): Promise<ContactInquiry[]> {
     try {
-      let q = collection(db, 'inquiries');
+      const q = collection(db, 'inquiries');
       const conditions = [];
 
       if (filters?.status) {
@@ -124,7 +124,7 @@ class ContactService {
     endDate?: Date;
   }): Promise<AppointmentRequest[]> {
     try {
-      let q = collection(db, 'appointments');
+      const q = collection(db, 'appointments');
       const conditions = [];
 
       if (filters?.status) {

@@ -16,6 +16,8 @@ const Header = ({ toggleSidebar }: HeaderProps) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [categories, setCategories] = useState<Category[]>([]);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState<string | null>(null);
+  const [mobileSubMenuOpen, setMobileSubMenuOpen] = useState<string | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -163,11 +165,45 @@ const Header = ({ toggleSidebar }: HeaderProps) => {
     .filter(cat => cat.showInHeader)
     .sort((a, b) => a.sortOrder - b.sortOrder);
 
+  // Add click handlers for mobile menu
+  const handleMobileMenuClick = (menuId: string) => {
+    setMobileMenuOpen(prevMenu => {
+      // If clicking the same menu that's open, close it
+      if (prevMenu === menuId) {
+        setMobileSubMenuOpen(null); // Also close submenu
+        return null;
+      }
+      // If clicking a different menu, open it and close others
+      setMobileSubMenuOpen(null);
+      return menuId;
+    });
+  };
+
+  const handleMobileSubMenuClick = (menuId: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setMobileSubMenuOpen(prevMenu => prevMenu === menuId ? null : menuId);
+  };
+
+  // Close menus when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest('.mobile-menu-container')) {
+        setMobileMenuOpen(null);
+        setMobileSubMenuOpen(null);
+      }
+    };
+
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, []);
+
   return (
-    <header className="fixed top-0 right-0 left-0 z-40 bg-transparent backdrop-blur-lg shadow-md border-b-[3px] border-[#FFD700] lg:pl-72 transition-all">
-      <div className="flex flex-col lg:flex-row lg:items-center h-auto px-4 py-2">
+    <header className="fixed top-0 right-0 left-0 z-40 bg-transparent backdrop-blur-lg shadow-md border-b-[3px] border-[#FFD700] lg:pl-72 transition-all overflow-visible">
+      <div className="flex flex-col lg:flex-row lg:items-center h-auto px-2 py-1 lg:py-1">
         {/* Logo and Mobile Menu */}
-        <div className="flex items-center justify-between w-full lg:w-auto gap-1 mb-2 lg:mb-0">
+        <div className="flex items-center gap-2 w-full lg:w-auto lg:mb-0">
           <div className="flex items-center gap-2">
             <Button
               variant="ghost"
@@ -175,10 +211,10 @@ const Header = ({ toggleSidebar }: HeaderProps) => {
               onClick={toggleSidebar}
               className="lg:hidden hover:bg-[#FFD700]/10 transition-all duration-300"
             >
-              <Menu className="h-10 w-10 text-[#0b0c33]" />
+            <Menu className="h-8 w-8 text-[#0b0c33]" />
             </Button>
 
-            <div className="w-10 h-10 lg:w-12 lg:h-12 rounded-full overflow-hidden border-4 border-[#FFD700] shadow-lg ring-2 ring-[#FFD700]/30">
+            <div className="w-8 h-8 lg:w-12 lg:h-12 rounded-full overflow-hidden border-4 border-[#FFD700] shadow-lg ring-2 ring-[#FFD700]/30">
               <img
                 src="/uploads/c70fae25-46f4-408e-a132-affaa273167d.jpg"
                 alt="Srinivasa Jewellers"
@@ -188,27 +224,161 @@ const Header = ({ toggleSidebar }: HeaderProps) => {
                 }}
               />
             </div>
-          </div>
-
-          {/* Search Form - Mobile */}
-          <form onSubmit={handleSearch} className="flex-1 max-w-[200px] lg:hidden ml-2">
-            <div className="relative">
-              <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500 h-4 w-4" />
-              <Input
-                type="search"
-                placeholder="Search..."
-                className="pl-8 w-full py-1 text-sm rounded-lg border-2 border-gray-300 focus:border-[#FFD700] focus:ring-[#FFD700]"
-                value={searchQuery}
-                onChange={handleSearchChange}
-              />
-            </div>
-          </form>
         </div>
 
-        {/* Categories and Search for larger screens */}
-        <div className="flex-grow flex flex-col lg:flex-row lg:items-center space-y-2 lg:space-y-0 lg:space-x-4 lg:ml-6">
-          {/* Categories Scroll Container */}
-          <div className="overflow-x-auto whitespace-nowrap flex gap-2 pb-2 scrollbar-hide -mx-4 px-4">
+          {/* Mobile Categories and Search */}
+          <div className="lg:hidden flex-1 overflow-x-auto mobile-menu-container relative">
+            <div className="flex items-center gap-2 min-w-max pr-4 no-scrollbar">
+              {/* All Jewellery Menu */}
+              <div className="relative flex-shrink-0">
+                <Button 
+                  variant="ghost" 
+                  className="flex items-center space-x-1 hover:bg-[#FFD700]/10 whitespace-nowrap"
+                  onClick={() => handleMobileMenuClick('allJewellery')}
+                >
+                  <span>All Jewellery</span>
+                  <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${mobileMenuOpen === 'allJewellery' ? 'rotate-180' : ''}`} />
+                </Button>
+                
+                {/* Main Menu - Mobile Dropdown */}
+                {mobileMenuOpen === 'allJewellery' && (
+                  <div 
+                    className="fixed left-2 top-[4rem] w-[280px] bg-white shadow-lg border border-gray-200 py-2 z-[9999] max-h-[calc(100vh-5rem)] overflow-y-auto rounded-lg"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div className="px-2">
+                      {mainCategories.map((category) => {
+                        const subcategories = getSubcategories(category.id);
+                        
+                        if (subcategories.length > 0) {
+                          return (
+                            <div key={category.id} className="relative">
+                              <button 
+                                className="w-full px-4 py-2 text-left flex items-center justify-between hover:bg-gray-100"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  handleMobileSubMenuClick(category.id, e);
+                                }}
+                              >
+                                <span>{category.name}</span>
+                                <ChevronRight className={`h-4 w-4 transition-transform duration-200 ${mobileSubMenuOpen === category.id ? 'rotate-90' : ''}`} />
+                              </button>
+                              
+                              {/* Submenu - Positioned for mobile */}
+                              {mobileSubMenuOpen === category.id && (
+                                <div 
+                                  className="bg-gray-50 w-full border-t border-gray-200"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  {subcategories.map((subcat) => (
+                                    <button
+                                      key={subcat.id}
+                                      className="w-full px-8 py-2 text-left hover:bg-gray-100"
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        handleCategoryClick(subcat.name);
+                                        setMobileMenuOpen(null);
+                                        setMobileSubMenuOpen(null);
+                                      }}
+                                    >
+                                      {subcat.name}
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        }
+                        
+                        return (
+                          <button
+                            key={category.id}
+                            className="w-full px-4 py-2 text-left hover:bg-gray-100"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleCategoryClick(category.name);
+                              setMobileMenuOpen(null);
+                            }}
+                          >
+                            {category.name}
+                          </button>
+                        );
+                      })}
+                      
+                      <div className="h-px bg-gray-200 my-1" />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Category Pills with Dropdowns */}
+              <div className="flex space-x-2 flex-nowrap">
+                {headerCategories.map((category) => (
+                  <div key={category.id} className="relative">
+                    <button
+                      onClick={() => handleMobileMenuClick(category.id)}
+                      className={`whitespace-nowrap px-3 py-1 text-sm rounded-full transition-colors flex items-center gap-1 ${
+                        selectedCategory === category.name
+                          ? "bg-[#9b87f5] text-black hover:bg-[#cae630]"
+                          : "text-[#040208] hover:bg-[#b2ce35]"
+                      }`}
+                    >
+                      {category.name}
+                      {getSubcategories(category.id).length > 0 && (
+                        <ChevronDown className={`h-3 w-3 transition-transform duration-200 ${mobileMenuOpen === category.id ? 'rotate-180' : ''}`} />
+                      )}
+                    </button>
+
+                    {/* Mobile Category Dropdown */}
+                    {getSubcategories(category.id).length > 0 && mobileMenuOpen === category.id && (
+                      <div 
+                        className="fixed left-2 top-[4rem] w-[280px] bg-white shadow-lg border border-gray-200 py-2 z-[9999] max-h-[calc(100vh-5rem)] overflow-y-auto rounded-lg"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <div className="px-2">
+                          {getSubcategories(category.id).map((subcat) => (
+                            <button
+                              key={subcat.id}
+                              className="w-full px-4 py-2 text-left hover:bg-gray-100"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                handleCategoryClick(subcat.name);
+                                setMobileMenuOpen(null);
+                              }}
+                            >
+                              {subcat.name}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {/* Search Form */}
+              <form onSubmit={handleSearch} className="flex-shrink-0 ml-2">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 h-4 w-4" />
+                  <Input
+                    type="search"
+                    placeholder="Search..."
+                    className="pl-10 w-[200px] py-2 text-sm rounded-lg border-2 border-gray-300 focus:border-[#FFD700] focus:ring-[#FFD700]"
+                    value={searchQuery}
+                    onChange={handleSearchChange}
+                  />
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+
+        {/* Desktop Categories and Search */}
+        <div className="hidden lg:flex flex-grow lg:flex-row lg:items-center lg:space-x-4 lg:ml-6 overflow-visible">
             {/* All Jewellery Hover Menu */}
             <div className="relative group flex-shrink-0">
             <Button 
@@ -261,37 +431,16 @@ const Header = ({ toggleSidebar }: HeaderProps) => {
                   </button>
                 );
               })}
-              
-              <div className="h-px bg-gray-200 my-1" />
-              
-              {/* Material Options */}
-              <button 
-                className={`w-full px-4 py-2 text-left hover:bg-gray-100 ${
-                  isFilterActive('material', 'Gold') ? "bg-[#FFD700]/10" : ""
-                }`}
-                onClick={() => handleFilterClick('material', 'Gold')}
-              >
-                Gold
-              </button>
-              <button
-                className={`w-full px-4 py-2 text-left hover:bg-gray-100 ${
-                  isFilterActive('material', 'Silver') ? "bg-[#FFD700]/10" : ""
-                }`}
-                onClick={() => handleFilterClick('material', 'Silver')}
-              >
-                Silver
-              </button>
             </div>
           </div>
 
           {/* Category Pills with Hover Dropdowns */}
-          <div className="flex space-x-2">
+          <div className="flex space-x-2 overflow-visible">
             {headerCategories.map((category) => (
               <div key={category.id} className="relative group/pill">
                 <button
                   onClick={() => handleCategoryClick(category.name)}
-                  className={`whitespace-nowrap px-3 py-1 text-sm rounded-full transition-colors flex items-center gap-1 ${
-                    selectedCategory === category.name
+                  className={`whitespace-nowrap px-3 py-1 text-sm rounded-full transition-colors flex items-center gap-1 ${selectedCategory === category.name
                     ? "bg-[#9b87f5] text-black hover:bg-[#cae630]"
                     : "text-[#040208] hover:bg-[#b2ce35]"
                   }`}
@@ -340,9 +489,8 @@ const Header = ({ toggleSidebar }: HeaderProps) => {
               </div>
             ))}
           </div>
-          </div>
 
-          {/* Search Form - Desktop */}
+          {/* Search Form */}
           <form onSubmit={handleSearch} className="hidden lg:block flex-1 max-w-md">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 h-4 w-4" />
